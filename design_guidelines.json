@@ -1,0 +1,104 @@
+{
+  "brand": {
+    "name": "flavouria",
+    "personality": "Modern, warm, premium, food-focused, trustworthy, simple, friendly, minimal, mobile-first",
+    "logo_instructions": "Lowercase wordmark 'flavouria'. Standalone icon combining subtle fork/bowl/leaf/warm-food elements. NO letter F.",
+    "differentiator": "Displays ONLY the Top 3 recipes per search. Core loop: SEARCH -> TOP 3 -> COMPARE -> CHOOSE -> COOK."
+  },
+  "theme": "light",
+  "colors": {
+    "background": "#FDFBF7",
+    "surface": "#FFFFFF",
+    "primary": "#111827",
+    "primary_muted": "#374151",
+    "accent_coral": "#FF6B5E",
+    "accent_coral_hover": "#F05649",
+    "secondary_yellow": "#FBBF24",
+    "supporting_green": "#22C55E",
+    "border": "#E2E8F0",
+    "text_main": "#111827",
+    "text_muted": "#64748B",
+    "glass": "bg-white/70 backdrop-blur-xl border border-white/20 shadow-sm",
+    "instructions_to_main_agent": "Maintain a warm, organic feel. Do not overuse all colors at once. Background should be warm cream/off-white. Text should be deep navy. Use coral for prominent CTAs. Yellow for ratings/stars. Green for dietary badges. Never use pure black (#000000)."
+  },
+  "typography": {
+    "heading_font": "Nunito",
+    "body_font": "Manrope",
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight text-primary",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-primary",
+      "h3": "text-xl sm:text-2xl font-bold text-primary",
+      "h4": "text-lg sm:text-xl font-bold text-primary",
+      "body": "text-base leading-relaxed text-text_main",
+      "small": "text-sm text-text_muted",
+      "micro": "text-xs font-bold tracking-widest uppercase text-text_muted"
+    },
+    "instructions_to_main_agent": "Ensure to import Nunito and Manrope fonts. Do not use generic fonts like Inter or Roboto for headings. Keep headings tight and bold, body text clean and legible."
+  },
+  "layouts": {
+    "hero": "A massive, centralized hero area. Headline 'What do you want to cook?' + supporting 'Get the 3 recipes worth your time.' A prominent, elevated search bar. Suggestion chips below. 'How it works' bento grid with 3 cards (01 Search, 02 Compare, 03 Cook).",
+    "search_results": "Bento-style asymmetric grid or vertical stacked list displaying exactly 3 rich, massive premium recipe cards. Focus on comparison.",
+    "recipe_card": "Highly rounded (`rounded-3xl`), white surface with soft shadow (`shadow-md`). Includes overlapping elegant rank badges (1st, 2nd, 3rd). Large high-quality image. Metadata tags (time, cuisine, spice, rating). Creator avatar. 'Why it's here' tag. CTAs: View Recipe & Watch Video.",
+    "recipe_detail": "Immersive hero image (max 80vh height). Clean bento-box layout for ingredients, numbered method steps, and rating widget.",
+    "creator_dashboard": "Clean, dense grid-based layout using Shadcn components (tables, charts, analytics widgets). Cardless or very subtle rounded cards with 1px borders.",
+    "general": "Mobile-first. Use generative padding (`p-6`, `p-8`, `p-12`). Container should be constrained `max-w-7xl mx-auto`."
+  },
+  "components": {
+    "buttons": "Pill-shaped (`rounded-full`) or highly rounded (`rounded-2xl`). Soft hover lifts (`-translate-y-0.5`). Primary button uses coral accent (`bg-[#FF6B5E] text-white hover:bg-[#F05649]`).",
+    "badges": "Pill shaped (`rounded-full`), subtle background tint (e.g., `bg-green-100 text-green-800` for time, `bg-yellow-100 text-yellow-800` for ratings, `bg-orange-100 text-orange-800` for spice).",
+    "search_bar": "Massive, highly visible. `h-16` or `h-20`. Left icon (search). Right side has the primary 'Search' button nested IN the input container. On focus, expand slightly with a subtle ring."
+  },
+  "motion": {
+    "hover_states": "Cards lift `-translate-y-1` and shadow deepens. Buttons scale slightly `scale-105`. Interactive elements must have transitions.",
+    "interactions": "Search bar focus expansion, rating star selection micro-animation, heart/bookmark scaling bounce on save, rank badge subtle pulse.",
+    "instructions_to_main_agent": "Use `framer-motion` for page transitions (fade-in, slide-up). Respect `prefers-reduced-motion`. Exclude transforms from universal transitions."
+  },
+  "accessibility": {
+    "contrast": "Ensure coral text and white text on coral meets APCA/WCAG standards. Do not use pure transparent backgrounds over content.",
+    "testing": "All interactive and key informational elements MUST include a `data-testid` attribute (e.g., `data-testid=\"search-input\"`, `data-testid=\"view-recipe-button\"`)."
+  },
+  "media": {
+    "image_urls": {
+      "chicken_biryani": [
+        "https://images.unsplash.com/photo-1589302168068-964664d93dc0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODl8MHwxfHNlYXJjaHwxfHxwcmVtaXVtJTIwY2hpY2tlbiUyMGJpcnlhbmklMjBmb29kJTIwcGhvdG9ncmFwaHl8ZW58MHx8fHwxNzg2MzgwMDQ4fDA&ixlib=rb-4.1.0&q=85",
+        "https://images.unsplash.com/photo-1631515243349-e0cb75fb8d3a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODl8MHwxfHNlYXJjaHwyfHxwcmVtaXVtJTIwY2hpY2tlbiUyMGJpcnlhbmklMjBmb29kJTIwcGhvdG9ncmFwaHl8ZW58MHx8fHwxNzg2MzgwMDQ4fDA&ixlib=rb-4.1.0&q=85"
+      ],
+      "pasta_carbonara": [
+        "https://images.unsplash.com/photo-1608756687911-aa1599ab3bd9?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTN8MHwxfHNlYXJjaHw0fHxwYXN0YSUyMGNhcmJvbmFyYSUyMHByZW1pdW0lMjBmb29kfGVufDB8fHx8MTc4NjM4MDA0OHww&ixlib=rb-4.1.0&q=85",
+        "https://images.unsplash.com/photo-1546549032-9571cd6b27df?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTN8MHwxfHNlYXJjaHwxfHxwYXN0YSUyMGNhcmJvbmFyYSUyMHByZW1pdW0lMjBmb29kfGVufDB8fHx8MTc4NjM4MDA0OHww&ixlib=rb-4.1.0&q=85"
+      ],
+      "momos": [
+        "https://images.unsplash.com/photo-1670300522639-ce378e5d23a1?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDF8MHwxfHNlYXJjaHwzfHxkdW1wbGluZ3MlMjBtb21vcyUyMGZvb2QlMjBwaG90b2dyYXBoeXxlbnwwfHx8fDE3ODYzODAwNDh8MA&ixlib=rb-4.1.0&q=85",
+        "https://images.unsplash.com/photo-1626322751504-930506dd41ca?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDF8MHwxfHNlYXJjaHwyfHxkdW1wbGluZ3MlMjBtb21vcyUyMGZvb2QlMjBwaG90b2dyYXBoeXxlbnwwfHx8fDE3ODYzODAwNDh8MA&ixlib=rb-4.1.0&q=85"
+      ],
+      "butter_chicken": [
+        "https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzh8MHwxfHNlYXJjaHwxfHxidXR0ZXIlMjBjaGlja2VuJTIwYm93bCUyMGZvb2R8ZW58MHx8fHwxNzg2MzgwMDQ4fDA&ixlib=rb-4.1.0&q=85",
+        "https://images.unsplash.com/photo-1603496987351-f84a3ba5ec85?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzh8MHwxfHNlYXJjaHwyfHxidXR0ZXIlMjBjaGlja2VuJTIwYm93bCUyMGZvb2R8ZW58MHx8fHwxNzg2MzgwMDQ4fDA&ixlib=rb-4.1.0&q=85"
+      ],
+      "chocolate_cake": [
+        "https://images.unsplash.com/photo-1774366126885-bef99f2f6d81?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzl8MHwxfHNlYXJjaHwxfHxjaG9jb2xhdGUlMjBjYWtlJTIwc2xpY2UlMjBkYXJrJTIwYmFja2dyb3VuZHxlbnwwfHx8fDE3ODMwNzcxMjZ8MA&ixlib=rb-4.1.0&q=85"
+      ],
+      "chefs_creators": [
+        "https://images.unsplash.com/photo-1771862860802-bd2e375f7422?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njd8MHwxfHNlYXJjaHwzfHxwZXJzb24lMjBjb29raW5nJTIwY2hlZiUyMG1vZGVybiUyMGtpdGNoZW58ZW58MHx8fHwxNzg2MzgwMDQ4fDA&ixlib=rb-4.1.0&q=85",
+        "https://images.unsplash.com/photo-1757621788643-395dc581dc6d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njd8MHwxfHNlYXJjaHwxfHxwZXJzb24lMjBjb29raW5nJTIwY2hlZiUyMG1vZGVybiUyMGtpdGNoZW58ZW58MHx8fHwxNzg2MzgwMDQ4fDA&ixlib=rb-4.1.0&q=85"
+      ]
+    },
+    "instructions_to_main_agent": "Use these exact image URLs as placeholders. Do not use generic dummy image services."
+  },
+  "GENERAL_UI_UX_DESIGN_GUIDELINES": [
+    "Prioritize using pre-existing components from src/components/ui when applicable.",
+    "Do not apply universal transitions (`transition: all`). Add transitions for specific interactive elements excluding transforms.",
+    "Do not center-align the app container (`.App { text-align: center; }` is strictly prohibited).",
+    "Ensure glass-morphism effects have actual blur and slight saturation boost.",
+    "Never use generic AI emojis like 🤖, 🧠 as icons. Use `lucide-react` icons exclusively.",
+    "Include hover states and micro-animations for all interactable elements.",
+    "Use generous spacing (`p-6` or `p-8` minimum inside containers).",
+    "Never use purely transparent backgrounds over content in headers or dropdowns.",
+    "All interactive elements MUST include `data-testid`."
+  ],
+  "instructions_to_main_agent": {
+    "tech_stack": "React.js (.js, NOT .tsx), Tailwind CSS, Shadcn UI primitives, Framer Motion.",
+    "routing": "Since this is full-stack, design flows for Homepage, Search Results Top-3, Recipe Detail, Categories, Creator Dashboard, Auth.",
+    "components": "Use Shadcn components for forms, inputs, selects, dropdowns, and dialogs. Use pure HTML/Tailwind for custom expressive layouts (like Top-3 cards). Use `sonner` for toasts."
+  }
+}

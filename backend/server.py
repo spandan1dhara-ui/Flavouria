@@ -13,6 +13,7 @@ from models import (RecipeCreate, RecipeUpdate, RatingBody, BecomeCreatorBody, S
                     PreferencesBody, ModerateBody, WeightsBody)
 import ranking
 import seed_data
+import youtube_agent
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("flavouria")
@@ -148,6 +149,16 @@ async def suggest_dish(body: SuggestDishBody, user=Depends(get_optional_user)):
         "created_at": datetime.now(timezone.utc).isoformat(),
     })
     return {"ok": True}
+
+
+@api.get("/youtube")
+async def youtube_search(q: str = Query("", alias="q")):
+    """Real-time YouTube AI recipe agent: top 3 live videos ranked by
+    views + likes + comment sentiment, each with an AI summary."""
+    query = q.strip()
+    if not query:
+        return {"query": "", "videos": []}
+    return await youtube_agent.search_youtube_recipes(query)
 
 
 # ---------------- Recipes ----------------
@@ -388,6 +399,28 @@ async def categories():
     rows = await db.recipes.aggregate(pipeline).to_list(100)
     return {"categories": [{"cuisine": r["_id"], "count": r["count"],
                             "regions": [x for x in r["regions"] if x]} for r in rows]}
+
+
+@api.get("/search-terms")
+async def search_terms():
+    """Vocabulary of known dish words for client-side fuzzy typo correction."""
+    recs = await db.recipes.find({"status": "PUBLISHED"},
+                                 {"_id": 0, "title": 1, "tags": 1, "cuisine": 1, "region": 1,
+                                  "category": 1, "ingredients": 1}).to_list(1000)
+    vocab = set()
+    for r in recs:
+        for w in ranking.tokenize(r.get("title", "")):
+            vocab.add(w)
+        for t in r.get("tags", []):
+            for w in ranking.tokenize(t):
+                vocab.add(w)
+        for key in ("cuisine", "region", "category"):
+            for w in ranking.tokenize(r.get(key, "") or ""):
+                vocab.add(w)
+        for ing in r.get("ingredients", []):
+            for w in ranking.tokenize(ing.get("name", "")):
+                vocab.add(w)
+    return {"terms": sorted(w for w in vocab if len(w) >= 3)}
 
 
 # ---------------- Admin ----------------

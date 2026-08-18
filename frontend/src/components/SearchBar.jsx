@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search } from "lucide-react";
+import { correctQuery } from "../lib/fuzzy";
 
 const EXAMPLES = ["Chicken Biryani", "Pasta Carbonara", "Momos", "Butter Chicken", "Chocolate Cake"];
 
@@ -9,11 +10,16 @@ export function SearchBar({ initial = "", showExamples = true, size = "lg", auto
   const [focused, setFocused] = useState(false);
   const navigate = useNavigate();
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e?.preventDefault();
     const term = q.trim();
     if (!term) return;
-    navigate(`/search?q=${encodeURIComponent(term)}`);
+    const corrected = await correctQuery(term);
+    if (corrected && corrected.toLowerCase() !== term.toLowerCase()) {
+      navigate(`/search?q=${encodeURIComponent(corrected)}&raw=${encodeURIComponent(term)}`);
+    } else {
+      navigate(`/search?q=${encodeURIComponent(term)}`);
+    }
   };
 
   const goExample = (ex) => navigate(`/search?q=${encodeURIComponent(ex)}`);

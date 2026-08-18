@@ -5,6 +5,7 @@ import { SlidersHorizontal, ArrowRight, X } from "lucide-react";
 import { api } from "../lib/api";
 import { SearchBar } from "../components/SearchBar";
 import { TopThreeCard } from "../components/TopThreeCard";
+import { YouTubeResults } from "../components/YouTubeResults";
 import { LoadingState, SearchEmptyState } from "../components/states";
 import { toast } from "sonner";
 
@@ -51,9 +52,13 @@ function FilterGroup({ title, options, value, onSelect }) {
 export default function SearchPage() {
   const [params] = useSearchParams();
   const query = params.get("q") || "";
+  const raw = params.get("raw") || "";
+  const corrected = raw && raw.toLowerCase() !== query.toLowerCase() ? query : null;
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
+  const [ytVideos, setYtVideos] = useState([]);
+  const [ytLoading, setYtLoading] = useState(false);
   const [filters, setFilters] = useState({ spice: null, diet: null, time: null, difficulty: null, cuisine: null });
 
   const fetchResults = useCallback(async () => {
@@ -80,6 +85,23 @@ export default function SearchPage() {
     window.scrollTo(0, 0);
     fetchResults();
   }, [fetchResults]);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      setYtLoading(true);
+      setYtVideos([]);
+      try {
+        const { data } = await api.get(`/youtube?q=${encodeURIComponent(query)}`);
+        if (active) setYtVideos(data.videos || []);
+      } catch {
+        if (active) setYtVideos([]);
+      } finally {
+        if (active) setYtLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [query]);
 
   const onSelect = (recipeId) => {
     api.post("/search/select", { search_id: data?.search_id, recipe_id: recipeId }).catch(() => {});
@@ -109,6 +131,12 @@ export default function SearchPage() {
       <div className="flex items-end justify-between gap-4 flex-wrap mb-6">
         <div>
           <h1 className="font-heading text-3xl sm:text-4xl font-black text-ink capitalize">{query}</h1>
+          {corrected && (
+            <p data-testid="fuzzy-correction-note" className="text-sm text-ink-soft mt-1">
+              Showing results for <span className="font-bold text-coral capitalize">{query}</span>
+              {" "}· searched for "<span className="capitalize">{raw}</span>"
+            </p>
+          )}
           {count === 3 && <p className="text-ink-soft mt-1 font-medium">The 3 recipes worth trying</p>}
           {count === 2 && <p className="text-ink-soft mt-1 font-medium">We found 2 great matches.</p>}
           {count === 1 && <p className="text-ink-soft mt-1 font-medium">We found 1 great match.</p>}
@@ -169,6 +197,8 @@ export default function SearchPage() {
           </div>
         </>
       )}
+
+      <YouTubeResults videos={ytVideos} loading={ytLoading} />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { Star, Users, Clock, Timer, ArrowLeft } from "lucide-react";
+import { Star, Users, Clock, Timer, ArrowLeft, ChefHat } from "lucide-react";
 import { api } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { SpiceBadge, TimeBadge, CuisineBadge, DietBadge, DifficultyBadge } from "../components/badges";
@@ -8,6 +8,7 @@ import { RatingInput, RatingCount } from "../components/RatingStars";
 import { CreatorBadge } from "../components/CreatorBadge";
 import { SaveButton } from "../components/SaveButton";
 import { RecipeVideo } from "../components/RecipeVideo";
+import { CookMode } from "../components/CookMode";
 import { LoadingState, RecipeEmptyState } from "../components/states";
 import { toast } from "sonner";
 
@@ -43,6 +44,7 @@ export default function RecipeDetail() {
   const [r, setR] = useState(null);
   const [loading, setLoading] = useState(true);
   const [myRating, setMyRating] = useState(0);
+  const [cookOpen, setCookOpen] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -119,8 +121,22 @@ export default function RecipeDetail() {
               <RatingCount count={r.rating_count} />
             </div>
           </div>
-          <SaveButton recipeId={r.id} initialSaved={r.is_saved} variant="full" />
+          <div className="flex items-center gap-2">
+            <button onClick={() => setCookOpen(true)} data-testid="cook-mode-button"
+              className="inline-flex items-center gap-2 rounded-full bg-ink text-white hover:bg-ink-soft px-5 h-12 font-bold transition-colors">
+              <ChefHat size={18} /> Cook Mode
+            </button>
+            <SaveButton recipeId={r.id} initialSaved={r.is_saved} variant="full" />
+          </div>
         </div>
+
+        <CookMode
+          open={cookOpen}
+          onClose={() => setCookOpen(false)}
+          title={r.title}
+          ingredients={(r.ingredients || []).map((i) => `${[i.quantity, i.unit].filter(Boolean).join(" ")} ${i.name}`.trim())}
+          method={r.instructions || []}
+        />
 
         <p className="mt-6 text-lg text-ink-soft leading-relaxed">{r.description}</p>
 

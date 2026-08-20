@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Plus, Utensils, Star, Eye, Award, Pencil, Trash2, MessageSquareWarning } from "lucide-react";
+import { Plus, Utensils, Star, Eye, Award, Pencil, Trash2, MessageSquareWarning, Search, Mail, Share2 } from "lucide-react";
 import { api } from "../lib/api";
 import { LoadingState } from "../components/states";
 import {
@@ -20,6 +20,11 @@ const STATUS_STYLE = {
 export default function CreatorDashboard() {
   const [data, setData] = useState(null);
   const navigate = useNavigate();
+  const [q, setQ] = useState("");
+
+  const shareUrl = (r) => `${window.location.origin}/recipe/${r.slug}`;
+  const shareEmail = (r) => { window.location.href = `mailto:?subject=${encodeURIComponent(r.title + " · Flavouria")}&body=${encodeURIComponent("Check out my recipe on Flavouria:\n" + shareUrl(r))}`; };
+  const shareWhatsApp = (r) => { window.open(`https://wa.me/?text=${encodeURIComponent(r.title + " · " + shareUrl(r))}`, "_blank"); };
 
   const load = () => api.get("/creator/dashboard").then(({ data }) => setData(data)).catch(() => setData(false));
 
@@ -39,6 +44,7 @@ export default function CreatorDashboard() {
   if (!data) return <div className="py-16 text-center text-ink-soft">Create a creator profile first. <Link to="/creator" className="text-coral font-bold">Become a creator →</Link></div>;
 
   const { creator, stats, recipes } = data;
+  const filtered = recipes.filter((r) => r.title.toLowerCase().includes(q.toLowerCase()));
   const cards = [
     { icon: Utensils, label: "Recipes published", value: stats.recipes_published },
     { icon: Award, label: "Total ratings", value: Number(stats.total_ratings).toLocaleString() },
@@ -73,13 +79,22 @@ export default function CreatorDashboard() {
         ))}
       </div>
 
-      <h2 className="font-heading text-2xl font-black text-ink mt-10 mb-4">Your recipes</h2>
+      <div className="mt-10 mb-4 flex items-center justify-between gap-4 flex-wrap">
+        <h2 className="font-heading text-2xl font-black text-ink">Your recipes</h2>
+        <div className="relative">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} data-testid="creator-recipe-search" placeholder="Search your recipes..."
+            className="h-11 w-64 max-w-full rounded-full border border-border bg-white pl-9 pr-4 outline-none focus:border-coral focus:ring-4 focus:ring-coral/10 font-medium text-sm" />
+        </div>
+      </div>
       <div className="rounded-3xl bg-white border border-border shadow-soft overflow-hidden">
         {recipes.length === 0 ? (
           <div className="p-10 text-center text-ink-soft">No recipes yet. Publish your first one!</div>
+        ) : filtered.length === 0 ? (
+          <div className="p-10 text-center text-ink-soft">No recipes match "{q}".</div>
         ) : (
           <div className="divide-y divide-border">
-            {recipes.map((r) => (
+            {filtered.map((r) => (
               <div key={r.id} data-testid={`dashboard-recipe-${r.slug}`} className="flex items-center gap-4 p-4">
                 <img src={r.thumbnail} alt="" className="w-16 h-16 rounded-xl object-cover shrink-0" />
                 <div className="flex-1 min-w-0">
@@ -92,6 +107,14 @@ export default function CreatorDashboard() {
                     <p className="text-xs text-coral-hover mt-1 flex items-center gap-1"><MessageSquareWarning size={13} /> {r.moderation_note}</p>
                   )}
                 </div>
+                <button onClick={() => shareWhatsApp(r)} data-testid={`share-whatsapp-${r.slug}`} title="Share on WhatsApp"
+                  className="grid place-items-center w-10 h-10 rounded-full border border-border hover:border-leaf hover:text-leaf transition-colors">
+                  <Share2 size={16} />
+                </button>
+                <button onClick={() => shareEmail(r)} data-testid={`share-email-${r.slug}`} title="Share via email"
+                  className="grid place-items-center w-10 h-10 rounded-full border border-border hover:border-coral hover:text-coral transition-colors">
+                  <Mail size={16} />
+                </button>
                 <button onClick={() => navigate(`/creator/recipes/${r.id}/edit`)} data-testid={`edit-recipe-${r.slug}`}
                   className="grid place-items-center w-10 h-10 rounded-full border border-border hover:border-coral hover:text-coral transition-colors">
                   <Pencil size={16} />

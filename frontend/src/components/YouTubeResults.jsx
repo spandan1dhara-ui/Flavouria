@@ -1,6 +1,11 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Play, Eye, ThumbsUp, Youtube, Sparkles, Lightbulb } from "lucide-react";
+import { Play, Eye, ThumbsUp, Youtube, Sparkles, Lightbulb, Heart, ChefHat } from "lucide-react";
+import { api } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
+import { CookMode } from "./CookMode";
+import { toast } from "sonner";
 
 const SENTIMENT = {
   positive: "bg-leaf/10 text-leaf",
@@ -21,13 +26,32 @@ function fmt(n) {
   return String(n);
 }
 
-export function VideoCard({ v, index = 0, onSelect }) {
+export function VideoCard({ v, index = 0, onSelect, initialSaved = false }) {
   const [play, setPlay] = useState(false);
+  const [saved, setSaved] = useState(initialSaved);
+  const [cookOpen, setCookOpen] = useState(false);
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const meta = RANK[v.rank] || RANK[3];
 
   const startPlay = () => {
     setPlay(true);
     onSelect?.(v.video_id);
+  };
+
+  const toggleSave = async () => {
+    if (!user) {
+      toast("Log in to save recipes");
+      navigate("/login");
+      return;
+    }
+    try {
+      const { data } = await api.post("/youtube/save", { video: v });
+      setSaved(data.saved);
+      toast(data.saved ? "Saved to your collection" : "Removed from saved");
+    } catch {
+      toast.error("Could not update saved state");
+    }
   };
 
   return (
@@ -76,10 +100,20 @@ export function VideoCard({ v, index = 0, onSelect }) {
           <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-bold capitalize ${SENTIMENT[v.sentiment] || SENTIMENT.positive}`}>{v.sentiment} vibes</span>
         </div>
 
-        <div className="mt-3 flex">
+        <div className="mt-3 flex items-center gap-2 flex-wrap">
           <span data-testid={`why-its-here-${v.rank}`} className="inline-flex items-center gap-1.5 rounded-full bg-leaf/10 text-leaf px-3 py-1 text-xs font-bold">
             <Sparkles size={13} /> {meta.why}
           </span>
+          <button onClick={toggleSave} data-testid={`yt-save-${v.rank}`}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3.5 h-9 text-sm font-bold border transition-all ${saved ? "bg-coral/10 border-coral text-coral-hover" : "bg-white border-border text-ink hover:border-coral"}`}>
+            <Heart size={15} className={saved ? "fill-coral text-coral" : ""} /> {saved ? "Saved" : "Save"}
+          </button>
+          {v.method?.length > 0 && (
+            <button onClick={() => setCookOpen(true)} data-testid={`yt-cook-${v.rank}`}
+              className="inline-flex items-center gap-1.5 rounded-full px-3.5 h-9 text-sm font-bold bg-ink text-white hover:bg-ink-soft transition-colors">
+              <ChefHat size={15} /> Cook Mode
+            </button>
+          )}
         </div>
 
         {/* AI summary */}
@@ -130,6 +164,8 @@ export function VideoCard({ v, index = 0, onSelect }) {
           </div>
         )}
       </div>
+
+      <CookMode open={cookOpen} onClose={() => setCookOpen(false)} title={v.title} ingredients={v.ingredients || []} method={v.method || []} />
     </motion.div>
   );
 }

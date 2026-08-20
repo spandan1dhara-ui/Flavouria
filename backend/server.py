@@ -161,6 +161,64 @@ async def youtube_search(q: str = Query("", alias="q")):
     return await youtube_agent.search_youtube_recipes(query)
 
 
+@api.get("/youtube/saved")
+async def youtube_saved(user=Depends(get_current_user)):
+    docs = await db.youtube_saved.find({"user_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return {"videos": [{**d["video"], "is_saved": True} for d in docs]}
+
+
+@api.post("/youtube/save")
+async def youtube_save(body: dict, user=Depends(get_current_user)):
+    video = body.get("video") or {}
+    vid = video.get("video_id")
+    if not vid:
+        raise HTTPException(status_code=400, detail="Missing video data")
+    existing = await db.youtube_saved.find_one({"user_id": user["id"], "video_id": vid})
+    if existing:
+        await db.youtube_saved.delete_one({"_id": existing["_id"]})
+        return {"saved": False}
+    await db.youtube_saved.insert_one({
+        "id": str(uuid.uuid4()), "user_id": user["id"], "video_id": vid, "video": video,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"saved": True}
+
+
+@api.get("/explore")
+async def explore(q: str = "", skip: int = 0, limit: int = 6):
+    """Paginated community recipes matching a query — powers the 'More Recipes' reveal.
+    Uses the Flavouria relevance score so results stay on-topic (no cross-dish noise)."""
+    query = q.strip()
+    filt = {"status": "PUBLISHED"}
+    if query:
+        ors = []
+        for tok in ranking.tokenize(query) + [query]:
+            rx = re.escape(tok)
+            ors.extend([
+                {"title": {"$regex": rx, "$options": "i"}},
+                {"tags": {"$regex": rx, "$options": "i"}},
+                {"cuisine": {"$regex": rx, "$options": "i"}},
+                {"region": {"$regex": rx, "$options": "i"}},
+                {"category": {"$regex": rx, "$options": "i"}},
+                {"ingredients.name": {"$regex": rx, "$options": "i"}},
+            ])
+        if ors:
+            filt["$or"] = ors
+    candidates = await db.recipes.find(filt, {"_id": 0}).to_list(300)
+    if query:
+        cfg = await get_ranking_config()
+        cmap = await creators_map({c["creator_id"] for c in candidates if c.get("creator_id")})
+        scored = ranking.score_recipes(candidates, query, cmap, cfg)
+        relevant = [r for r in scored if r["score_breakdown"]["search_relevance"] >= 0.5]
+        ordered = relevant if relevant else scored
+    else:
+        ordered = sorted(candidates, key=lambda r: r.get("rating_count", 0), reverse=True)
+    total = len(ordered)
+    page = ordered[skip:skip + limit]
+    await attach_creators(page)
+    return {"total": total, "recipes": page, "skip": skip, "limit": limit}
+
+
 # ---------------- Recipes ----------------
 @api.get("/recipes")
 async def list_recipes(cuisine: str = None, category: str = None, diet: str = None,

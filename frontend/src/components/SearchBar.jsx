@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search } from "lucide-react";
 import { correctQuery } from "../lib/fuzzy";
@@ -9,6 +9,8 @@ export function SearchBar({ initial = "", showExamples = true, size = "lg", auto
   const [q, setQ] = useState(initial);
   const [focused, setFocused] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => { setQ(initial); }, [initial]);
 
   const submit = async (e) => {
     e?.preventDefault();

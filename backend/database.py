@@ -30,3 +30,6 @@ async def create_indexes():
     await db.saved_recipes.create_index([("user_id", 1), ("recipe_id", 1)], unique=True)
     await db.youtube_saved.create_index([("user_id", 1), ("video_id", 1)], unique=True)
     await db.search_events.create_index("created_at")
+    await db.ai_recipes.create_index("key", unique=True)
+    await db.ai_recipes.create_index("id", unique=True)
+    await db.shopping_lists.create_index([("user_id", 1), ("created_at", -1)])

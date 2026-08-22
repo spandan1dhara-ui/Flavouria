@@ -7,7 +7,7 @@ import {
 } from "../components/ui/dialog";
 import {
   Search, Minus, Plus, Users, Clock, Plus as PlusIcon, Trash2, ShoppingCart,
-  ListChecks, Loader2, Check, ChefHat,
+  ListChecks, Loader2, Check, ChefHat, Sparkles, Utensils,
 } from "lucide-react";
 
 function PaxStepper({ value, onChange, testidPrefix }) {
@@ -39,6 +39,7 @@ export default function PlanMeal() {
   const [items, setItems] = useState([]); // staged {recipe, pax}
   const [viewOpen, setViewOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
 
   const doSearch = async (e) => {
     e?.preventDefault();
@@ -59,6 +60,26 @@ export default function PlanMeal() {
   const pick = (recipe) => {
     setSelected(recipe);
     setSelectedPax(recipe.servings || 2);
+  };
+
+  const generateWithAI = async () => {
+    const q = query.trim();
+    if (!q) return;
+    setAiLoading(true);
+    try {
+      const { data } = await api.post("/recipes/ai-generate", { query: q });
+      const rec = data.recipe;
+      setResults((prev) => {
+        const list = prev || [];
+        return list.some((r) => r.id === rec.id) ? list : [...list, rec];
+      });
+      pick(rec);
+      toast.success(`AI created "${rec.title}"`);
+    } catch (err) {
+      toast.error(formatError(err?.response?.data?.detail));
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   const addToList = () => {
@@ -133,27 +154,52 @@ export default function PlanMeal() {
         {results && (
           <div className="mt-5" data-testid="recipe-search-results">
             {results.length === 0 ? (
-              <p className="text-ink-soft py-4">No recipes found for "{query}". Try another dish.</p>
-            ) : (
-              <div className="grid gap-2">
-                {results.map((r) => {
-                  const active = selected?.id === r.id;
-                  return (
-                    <button key={r.id} type="button" data-testid={`result-${r.id}`} onClick={() => pick(r)}
-                      className={`flex items-center gap-3 rounded-2xl border p-2.5 text-left transition-colors ${active ? "border-coral bg-coral/5" : "border-border bg-white hover:border-coral/60"}`}>
-                      {r.thumbnail && <img src={r.thumbnail} alt="" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />}
-                      <div className="min-w-0 flex-1">
-                        <p className="font-bold text-ink truncate">{r.title}</p>
-                        <div className="flex items-center gap-3 text-sm text-ink-soft">
-                          {r.cuisine && <span>{r.cuisine}</span>}
-                          {r.cook_time != null && <span className="inline-flex items-center gap-1"><Clock size={13} /> {r.cook_time}m</span>}
-                        </div>
-                      </div>
-                      {active && <Check className="text-coral flex-shrink-0" size={20} />}
-                    </button>
-                  );
-                })}
+              <div className="py-4 text-center">
+                <p className="text-ink-soft">No community recipes found for "{query}".</p>
+                <button type="button" data-testid="ai-generate-button" onClick={generateWithAI} disabled={aiLoading}
+                  className="mt-4 inline-flex items-center gap-2 h-12 px-6 rounded-full bg-ink hover:bg-ink/90 text-white font-bold transition-colors disabled:opacity-60">
+                  {aiLoading ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />}
+                  Generate "{query}" with AI
+                </button>
               </div>
+            ) : (
+              <>
+                <div className="grid gap-2">
+                  {results.map((r) => {
+                    const active = selected?.id === r.id;
+                    return (
+                      <button key={r.id} type="button" data-testid={`result-${r.id}`} onClick={() => pick(r)}
+                        className={`flex items-center gap-3 rounded-2xl border p-2.5 text-left transition-colors ${active ? "border-coral bg-coral/5" : "border-border bg-white hover:border-coral/60"}`}>
+                        {r.thumbnail ? (
+                          <img src={r.thumbnail} alt="" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
+                        ) : (
+                          <span className={`grid place-items-center w-14 h-14 rounded-xl flex-shrink-0 ${r.source === "ai" ? "bg-ink/5 text-coral" : "bg-secondary text-ink-soft"}`}>
+                            {r.source === "ai" ? <Sparkles size={22} /> : <Utensils size={22} />}
+                          </span>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-ink truncate flex items-center gap-2">
+                            {r.title}
+                            {r.source === "ai" && <span className="inline-flex items-center gap-1 rounded-full bg-ink/5 px-2 py-0.5 text-xs font-bold text-coral"><Sparkles size={11} /> AI</span>}
+                          </p>
+                          <div className="flex items-center gap-3 text-sm text-ink-soft">
+                            {r.cuisine && <span>{r.cuisine}</span>}
+                            {r.cook_time != null && <span className="inline-flex items-center gap-1"><Clock size={13} /> {r.cook_time}m</span>}
+                          </div>
+                        </div>
+                        {active && <Check className="text-coral flex-shrink-0" size={20} />}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-3 flex items-center justify-center">
+                  <button type="button" data-testid="ai-generate-button" onClick={generateWithAI} disabled={aiLoading}
+                    className="inline-flex items-center gap-2 text-sm font-bold text-ink-soft hover:text-coral transition-colors disabled:opacity-60">
+                    {aiLoading ? <Loader2 className="animate-spin" size={15} /> : <Sparkles size={15} />}
+                    Not here? Generate "{query}" with AI
+                  </button>
+                </div>
+              </>
             )}
           </div>
         )}

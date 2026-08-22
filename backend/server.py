@@ -15,6 +15,7 @@ import ranking
 import seed_data
 import youtube_agent
 import cooking_guide
+import ai_recipe
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("flavouria")
@@ -399,6 +400,33 @@ async def recipes_lookup(q: str = Query("", alias="q"), limit: int = 8):
     return {"query": query, "results": [_lookup_recipe_card(r) for r in ordered[:limit]]}
 
 
+@api.post("/recipes/ai-generate")
+async def recipes_ai_generate(body: SuggestDishBody, user=Depends(get_current_user)):
+    """Generate a recipe with AI for a dish that isn't in the community database
+    (e.g. regional Indian dishes), so it can be added to a shopping list."""
+    name = (body.query or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Enter a dish name to generate")
+    rec = await ai_recipe.generate_ai_recipe(name)
+    if not rec:
+        raise HTTPException(status_code=502, detail="Couldn't generate that recipe. Please try again.")
+    card = _lookup_recipe_card(rec)
+    card["source"] = "ai"
+    return {"recipe": card}
+
+
+async def _resolve_recipes(ids):
+    """Resolve recipe ids from both the community DB and AI-generated recipes."""
+    docs = await db.recipes.find({"id": {"$in": ids}}, {"_id": 0}).to_list(200)
+    by_id = {d["id"]: d for d in docs}
+    missing = [i for i in ids if i not in by_id]
+    if missing:
+        ai_docs = await db.ai_recipes.find({"id": {"$in": missing}}, {"_id": 0}).to_list(200)
+        for d in ai_docs:
+            by_id[d["id"]] = d
+    return by_id
+
+
 def _public_list(doc):
     return {"id": doc["id"], "name": doc.get("name") or "My shopping list",
             "recipes": doc.get("recipes", []), "shopping_list": doc.get("shopping_list", []),
@@ -411,8 +439,7 @@ async def create_shopping_list(body: ShoppingListCreate, user=Depends(get_curren
     if not body.items:
         raise HTTPException(status_code=400, detail="Add at least one recipe to your list")
     ids = [it.recipe_id for it in body.items]
-    docs = await db.recipes.find({"id": {"$in": ids}, "status": "PUBLISHED"}, {"_id": 0}).to_list(200)
-    by_id = {d["id"]: d for d in docs}
+    by_id = await _resolve_recipes(ids)
     pairs, recipes_meta = [], []
     for it in body.items:
         rec = by_id.get(it.recipe_id)
@@ -472,8 +499,7 @@ async def shopping_list_cooking_guide(list_id: str, user=Depends(get_current_use
         return {"cooking_guide": doc["cooking_guide"]}
 
     ids = [m["recipe_id"] for m in doc.get("recipes", [])]
-    recs = await db.recipes.find({"id": {"$in": ids}}, {"_id": 0}).to_list(200)
-    by_id = {r["id"]: r for r in recs}
+    by_id = await _resolve_recipes(ids)
     payload = []
     for m in doc.get("recipes", []):
         rec = by_id.get(m["recipe_id"])

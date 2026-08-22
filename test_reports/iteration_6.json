@@ -1,0 +1,27 @@
+{
+  "summary": "Focused test of the AI recipe generation fix (POST /api/recipes/ai-generate) and AI recipes flowing through the shopping-list builder. Backend: 11/11 pytest tests passed (auth gating, 400 on empty query, valid AI recipe for non-seeded regional Indian dishes 'Shorshe Ilish'/'Aloo Posto', cache returns same id in <10s, community lookup regression for 'plain rice' and 'mutton kosha', mixed AI+community shopping list with 2x quantity scaling verified numerically, persistence via GET, cooking-guide non-empty + cached, 404 for unknown ai- id). Frontend: full e2e on /plan-meal with admin login — searched 'Shukto' (not seeded), empty-state ai-generate-button labelled 'Generate \"Shukto\" with AI' generated the recipe, auto-selected it with AI badge and sparkles placeholder, Add to List -> Generate My List -> /shopping-lists/<id> with 15 consolidated ingredients -> Start Cooking opened Cook Mode with an 11-step AI-derived guide (Next navigation works). With community results present, the bottom 'Not here? Generate \"plain rice\" with AI' button renders correctly. No console errors other than expected anonymous 401s.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/plan-meal results list", "issues": ["Community recipes without a thumbnail fall back to the same Sparkles placeholder icon used to signal AI recipes (e.g. 'Steamed Plain Rice' / 'Veg Hakka Fried Rice' show a sparkles tile) — consider a neutral utensil/photo icon so sparkles stays exclusive to AI results"]},
+      {"screen": "/shopping-lists/<id>", "issues": ["AI-generated ingredient names carry prep text into the shopping list (e.g. 'Bitter gourd (karela), sliced into rounds', 'Raw banana, peeled and cubed'); prompt could ask for bare ingredient names so consolidation/merging works better across recipes"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_ai_recipe.py", "/app/test_reports/pytest/pytest_ai_recipe.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ai_recipe.generate_ai_recipe caches by lowercased raw query, so typo variants ('shorse ilish') create separate LLM docs — consider light normalization/aliasing to cut cost",
+    "db.ai_recipes has no index on 'key'/'id'; add indexes since _resolve_recipes and cache lookups query them on every shopping-list build",
+    "AI recipes are never pruned; add a TTL or cleanup for db.ai_recipes to avoid unbounded growth"
+  ],
+  "updated_files": ["/app/backend/tests/test_ai_recipe.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "AI recipes cached in db.ai_recipes for Shorshe Ilish, Aloo Posto, Chingri Malai Curry, Shukto; test shopping lists (TEST_ai_*) deleted in teardown. One UI-created list named 'Shukto' remains under admin@flavouria.com.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "admin@flavouria.com / Flavouria@2026 (worked)",
+  "context_for_next_testing_agent": "New suite /app/backend/tests/test_ai_recipe.py covers ai-generate + AI recipes in shopping lists; run with `cd /app/backend && python -m pytest tests/test_ai_recipe.py`. First LLM call per dish ~10-25s, cached repeats <1s. Full shopping-list suite (test_shopping_lists.py) was intentionally not re-run.",
+  "rca_of_the_issue": "Original bug (regional Indian dishes missing in the /plan-meal builder) is resolved: _resolve_recipes now looks up db.ai_recipes in addition to db.recipes, so an ai- id can be added to a list, consolidated with scaling, and used for the cooking guide. Verified end-to-end in UI and API."
+}

@@ -22,13 +22,13 @@ export default function Categories() {
       <div className="max-w-2xl">
         <p className="text-xs font-bold tracking-widest uppercase text-coral">Discover</p>
         <h1 className="mt-2 font-heading text-4xl sm:text-5xl font-black text-ink">Browse by cuisine</h1>
-        <p className="mt-3 text-lg text-ink-soft">
-          Pick a cuisine to explore — or search directly for the exact dish you're craving.
-        </p>
       </div>
 
       <div className="mt-8 max-w-2xl">
         <SearchBar size="md" showExamples={false} />
+        <p className="mt-4 text-lg text-ink-soft">
+          Pick a cuisine to explore — or search directly for the exact dish you're craving.
+        </p>
       </div>
 
       <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -449,14 +449,32 @@ async def creator_profile(slug: str):
     return {"creator": public_creator(creator), "recipes": recs}
 
 
+# Curated cuisine groups shown on the Browse-by-cuisine page.
+CUISINE_GROUPS = [
+    {"cuisine": "Oriental", "regions": ["Chinese", "Japanese", "Korean", "Thai", "Vietnamese"]},
+    {"cuisine": "Mediterranean", "regions": ["Greek", "Turkish", "Lebanese", "Spanish"]},
+    {"cuisine": "Indian", "regions": ["Oriya", "Marathi", "Bengali", "South Indian", "North Indian", "Assamese"]},
+    {"cuisine": "Italian", "regions": ["Neapolitan", "Emilian", "Roman"]},
+    {"cuisine": "French", "regions": ["Provencal", "Parisian"]},
+    {"cuisine": "Mexican", "regions": ["Oaxacan", "Yucatecan"]},
+]
+
+
 @api.get("/categories")
 async def categories():
-    pipeline = [{"$match": {"status": "PUBLISHED"}},
-                {"$group": {"_id": "$cuisine", "count": {"$sum": 1},
-                            "regions": {"$addToSet": "$region"}}}]
-    rows = await db.recipes.aggregate(pipeline).to_list(100)
-    return {"categories": [{"cuisine": r["_id"], "count": r["count"],
-                            "regions": [x for x in r["regions"] if x]} for r in rows]}
+    rows = await db.recipes.find(
+        {"status": "PUBLISHED"}, {"_id": 0, "cuisine": 1, "region": 1}
+    ).to_list(1000)
+    result = []
+    for grp in CUISINE_GROUPS:
+        terms = [grp["cuisine"].lower()] + [r.lower() for r in grp["regions"]]
+        count = 0
+        for rec in rows:
+            hay = f"{(rec.get('cuisine') or '').lower()} {(rec.get('region') or '').lower()}"
+            if any(t in hay for t in terms):
+                count += 1
+        result.append({"cuisine": grp["cuisine"], "count": count, "regions": grp["regions"]})
+    return {"categories": result}
 
 
 @api.get("/search-terms")

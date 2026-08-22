@@ -76,3 +76,13 @@ class ModerateBody(BaseModel):
 
 class WeightsBody(BaseModel):
     weights: dict
+
+
+class ShoppingListItem(BaseModel):
+    recipe_id: str
+    pax: int = 2
+
+
+class ShoppingListCreate(BaseModel):
+    name: Optional[str] = None
+    items: List[ShoppingListItem] = Field(default_factory=list)

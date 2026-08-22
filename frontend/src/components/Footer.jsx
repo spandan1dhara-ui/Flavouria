@@ -1,8 +1,10 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { LogoIcon } from "./Logo";
+import { useAuth } from "../context/AuthContext";
 
 export function Footer() {
+  const { user } = useAuth();
   return (
     <footer id="about" className="mt-24 border-t border-border/60 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-14 grid gap-10 md:grid-cols-[1.4fr_1fr_1fr]">
@@ -24,6 +26,7 @@ export function Footer() {
           <ul className="space-y-2 text-ink-soft font-semibold">
             <li><Link to="/" className="hover:text-coral">Discover</Link></li>
             <li><Link to="/categories" className="hover:text-coral">Categories</Link></li>
+            <li><Link to="/plan-meal" className="hover:text-coral">Plan your Meal</Link></li>
             <li><Link to="/search?q=chicken+biryani" className="hover:text-coral">Popular searches</Link></li>
           </ul>
         </div>
@@ -32,7 +35,7 @@ export function Footer() {
           <ul className="space-y-2 text-ink-soft font-semibold">
             <li><Link to="/creator" className="hover:text-coral">Become a Creator</Link></li>
             <li><Link to="/creator/dashboard" className="hover:text-coral">Creator dashboard</Link></li>
-            <li><Link to="/login" className="hover:text-coral">Log in</Link></li>
+            {!user && <li><Link to="/login" className="hover:text-coral">Log in</Link></li>}
           </ul>
         </div>
       </div>

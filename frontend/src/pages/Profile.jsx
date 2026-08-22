@@ -5,6 +5,7 @@ import { RecipeCard } from "../components/RecipeCard";
 import { RatingStars } from "../components/RatingStars";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { ShoppingCart, ChefHat, Trash2 } from "lucide-react";
 
 const SPICE = ["mild", "medium", "spicy"];
 const DIETS = ["Vegetarian", "Non-Vegetarian", "Vegan", "Egg"];
@@ -26,13 +27,32 @@ export default function Profile() {
   const { user, refreshUser } = useAuth();
   const [prefs, setPrefs] = useState(user?.preferences || {});
   const [ratings, setRatings] = useState([]);
+  const [lists, setLists] = useState([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
     setPrefs(user?.preferences || {});
     api.get("/my/ratings").then(({ data }) => setRatings(data.recipes)).catch(() => {});
+    api.get("/shopping-lists").then(({ data }) => setLists(data.lists)).catch(() => {});
   }, [user]);
+
+  const deleteList = async (id) => {
+    if (!window.confirm("Delete this shopping list? This can't be undone.")) return;
+    try {
+      await api.delete(`/shopping-lists/${id}`);
+      setLists((prev) => prev.filter((l) => l.id !== id));
+      toast.success("List deleted");
+    } catch {
+      toast.error("Could not delete list");
+    }
+  };
+
+  const fmtDate = (iso) => {
+    if (!iso) return "";
+    try { return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }); }
+    catch { return ""; }
+  };
 
   const toggleArr = (key, val) => {
     setPrefs((p) => {
@@ -123,6 +143,44 @@ export default function Profile() {
           className="mt-6 h-12 px-6 rounded-full bg-coral hover:bg-coral-hover text-white font-bold transition-colors disabled:opacity-60">
           {saving ? "Saving..." : "Save preferences"}
         </button>
+      </div>
+
+      {/* Shopping Lists */}
+      <div id="shopping-lists" className="mt-8 scroll-mt-20">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-heading text-2xl font-black text-ink flex items-center gap-2">
+            <ShoppingCart size={22} className="text-coral" /> Shopping Lists
+          </h2>
+          <Link to="/plan-meal" data-testid="build-new-list" className="text-sm font-bold text-coral hover:underline">Build a new list →</Link>
+        </div>
+        {lists.length === 0 ? (
+          <p className="text-ink-soft">No shopping lists yet. <Link to="/plan-meal" className="font-bold text-coral">Plan your meal →</Link></p>
+        ) : (
+          <div className="grid gap-3" data-testid="shopping-lists">
+            {lists.map((l) => (
+              <div key={l.id} data-testid={`list-card-${l.id}`} className="rounded-3xl bg-white border border-border shadow-soft p-5 flex flex-wrap items-center justify-between gap-4 hover:shadow-lift transition-shadow">
+                <Link to={`/shopping-lists/${l.id}`} className="min-w-0 flex-1">
+                  <p className="font-heading text-lg font-black text-ink truncate">{l.name}</p>
+                  <div className="mt-1 flex items-center gap-4 text-sm text-ink-soft">
+                    <span className="inline-flex items-center gap-1"><ChefHat size={14} /> {l.recipes.length} {l.recipes.length === 1 ? "recipe" : "recipes"}</span>
+                    <span className="inline-flex items-center gap-1"><ShoppingCart size={14} /> {l.shopping_list.length} items</span>
+                    {l.created_at && <span className="text-ink-soft/70">{fmtDate(l.created_at)}</span>}
+                  </div>
+                </Link>
+                <div className="flex items-center gap-2">
+                  <Link to={`/shopping-lists/${l.id}`} data-testid={`open-list-${l.id}`}
+                    className="inline-flex items-center gap-2 h-11 px-5 rounded-full bg-leaf hover:brightness-95 text-white font-bold transition">
+                    <ChefHat size={17} /> Start Cooking
+                  </Link>
+                  <button data-testid={`delete-list-${l.id}`} onClick={() => deleteList(l.id)}
+                    className="grid place-items-center w-11 h-11 rounded-full text-ink-soft hover:text-coral hover:bg-coral/10 transition-colors" aria-label="Delete list">
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* My ratings */}

@@ -12,6 +12,7 @@ import SearchPage from "./pages/Search";
 import RecipeDetail from "./pages/RecipeDetail";
 import Categories from "./pages/Categories";
 import PlanMeal from "./pages/PlanMeal";
+import ShoppingListDetail from "./pages/ShoppingListDetail";
 import CreatorLanding from "./pages/CreatorLanding";
 import CreatorDashboard from "./pages/CreatorDashboard";
 import RecipeBuilder from "./pages/RecipeBuilder";
@@ -55,7 +56,8 @@ function AppRouter() {
         <Route path="/search" element={<SearchPage />} />
         <Route path="/recipe/:slug" element={<RecipeDetail />} />
         <Route path="/categories" element={<Categories />} />
-        <Route path="/plan-meal" element={<PlanMeal />} />
+        <Route path="/plan-meal" element={<Protected><PlanMeal /></Protected>} />
+        <Route path="/shopping-lists/:id" element={<Protected><ShoppingListDetail /></Protected>} />
         <Route path="/about" element={<About />} />
         <Route path="/creator" element={<CreatorLanding />} />
         <Route

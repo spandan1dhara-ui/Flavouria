@@ -10,10 +10,11 @@ from starlette.middleware.cors import CORSMiddleware
 from database import db, create_indexes
 from auth import (auth_router, seed_admin, get_current_user, get_optional_user, require_role)
 from models import (RecipeCreate, RecipeUpdate, RatingBody, BecomeCreatorBody, SuggestDishBody,
-                    PreferencesBody, ModerateBody, WeightsBody)
+                    PreferencesBody, ModerateBody, WeightsBody, ShoppingListCreate)
 import ranking
 import seed_data
 import youtube_agent
+import cooking_guide
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("flavouria")
@@ -62,6 +63,63 @@ def scale_quantity(qty, factor):
     else:
         val = ("%.2f" % scaled).rstrip("0").rstrip(".")
     return (val + q[m.end():]).strip()
+
+
+def parse_qty(q):
+    """Return (numeric_value or None, trailing_text) parsed from a quantity string."""
+    q = (q or "").strip()
+    m = re.match(r"^\s*(\d+(?:\.\d+)?(?:\s*/\s*\d+)?)", q)
+    if not m:
+        return None, q
+    raw = m.group(1)
+    try:
+        if "/" in raw:
+            a, b = raw.split("/")
+            num = float(a) / float(b)
+        else:
+            num = float(raw)
+    except (ValueError, ZeroDivisionError):
+        return None, q
+    return num, q[m.end():].strip()
+
+
+def _fmt_num(total):
+    if abs(total - round(total)) < 1e-9:
+        return str(int(round(total)))
+    return ("%.2f" % total).rstrip("0").rstrip(".")
+
+
+def consolidate_ingredients(recipe_pax_pairs):
+    """Merge scaled ingredients across multiple recipes.
+    recipe_pax_pairs: list of (recipe_doc, pax). Ingredients are grouped by
+    (name, unit); numeric quantities are scaled by pax/servings and summed."""
+    agg = {}
+    order = []
+    for rec, pax in recipe_pax_pairs:
+        base = max(1, int(rec.get("servings") or 1))
+        factor = pax / base
+        for ingr in rec.get("ingredients", []):
+            name = (ingr.get("name") or "").strip()
+            if not name:
+                continue
+            unit = (ingr.get("unit") or "").strip()
+            key = (name.lower(), unit.lower())
+            if key not in agg:
+                agg[key] = {"name": name, "unit": unit, "total": 0.0,
+                            "has_num": False, "has_nonnum": False}
+                order.append(key)
+            num, _ = parse_qty(ingr.get("quantity", ""))
+            if num is not None:
+                agg[key]["total"] += num * factor
+                agg[key]["has_num"] = True
+            else:
+                agg[key]["has_nonnum"] = True
+    out = []
+    for key in order:
+        e = agg[key]
+        qty = _fmt_num(e["total"]) if e["has_num"] else ""
+        out.append({"name": e["name"], "unit": e["unit"], "quantity": qty})
+    return out
 
 
 async def get_ranking_config():
@@ -301,6 +359,139 @@ async def meal_plan(q: str = Query("", alias="q"), pax: int = 2):
         },
         "shopping_list": shopping_list,
     }
+
+
+# ---------------- Multi-recipe shopping lists ----------------
+def _lookup_recipe_card(r):
+    return {"id": r.get("id"), "title": r.get("title"), "slug": r.get("slug"),
+            "thumbnail": r.get("thumbnail"), "cuisine": r.get("cuisine"),
+            "category": r.get("category"), "servings": r.get("servings"),
+            "cook_time": r.get("cook_time"), "difficulty": r.get("difficulty")}
+
+
+@api.get("/recipes/lookup")
+async def recipes_lookup(q: str = Query("", alias="q"), limit: int = 8):
+    """Search published recipes for the shopping-list builder (returns match cards)."""
+    query = q.strip()
+    filt = {"status": "PUBLISHED"}
+    if query:
+        ors = []
+        for tok in ranking.tokenize(query) + [query]:
+            rx = re.escape(tok)
+            ors.extend([
+                {"title": {"$regex": rx, "$options": "i"}},
+                {"tags": {"$regex": rx, "$options": "i"}},
+                {"category": {"$regex": rx, "$options": "i"}},
+                {"cuisine": {"$regex": rx, "$options": "i"}},
+                {"region": {"$regex": rx, "$options": "i"}},
+            ])
+        if ors:
+            filt["$or"] = ors
+    candidates = await db.recipes.find(filt, {"_id": 0}).to_list(200)
+    if query:
+        cfg = await get_ranking_config()
+        cmap = await creators_map({c["creator_id"] for c in candidates if c.get("creator_id")})
+        scored = ranking.score_recipes(candidates, query, cmap, cfg)
+        relevant = [r for r in scored if r["score_breakdown"]["search_relevance"] >= 0.4] or scored
+        ordered = relevant
+    else:
+        ordered = sorted(candidates, key=lambda r: r.get("rating_count", 0), reverse=True)
+    return {"query": query, "results": [_lookup_recipe_card(r) for r in ordered[:limit]]}
+
+
+def _public_list(doc):
+    return {"id": doc["id"], "name": doc.get("name") or "My shopping list",
+            "recipes": doc.get("recipes", []), "shopping_list": doc.get("shopping_list", []),
+            "cooking_guide": doc.get("cooking_guide"),
+            "created_at": doc.get("created_at")}
+
+
+@api.post("/shopping-lists")
+async def create_shopping_list(body: ShoppingListCreate, user=Depends(get_current_user)):
+    if not body.items:
+        raise HTTPException(status_code=400, detail="Add at least one recipe to your list")
+    ids = [it.recipe_id for it in body.items]
+    docs = await db.recipes.find({"id": {"$in": ids}, "status": "PUBLISHED"}, {"_id": 0}).to_list(200)
+    by_id = {d["id"]: d for d in docs}
+    pairs, recipes_meta = [], []
+    for it in body.items:
+        rec = by_id.get(it.recipe_id)
+        if not rec:
+            continue
+        pax = max(1, min(int(it.pax or 1), 100))
+        pairs.append((rec, pax))
+        recipes_meta.append({
+            "recipe_id": rec["id"], "title": rec.get("title"), "slug": rec.get("slug"),
+            "thumbnail": rec.get("thumbnail"), "pax": pax, "servings": rec.get("servings"),
+            "cook_time": rec.get("cook_time"), "cuisine": rec.get("cuisine"),
+        })
+    if not pairs:
+        raise HTTPException(status_code=404, detail="None of the selected recipes were found")
+
+    shopping = consolidate_ingredients(pairs)
+    name = (body.name or "").strip() or ", ".join(m["title"] for m in recipes_meta[:3]) + \
+        (f" +{len(recipes_meta) - 3} more" if len(recipes_meta) > 3 else "")
+    doc = {
+        "id": str(uuid.uuid4()), "user_id": user["id"], "name": name,
+        "recipes": recipes_meta, "shopping_list": shopping, "cooking_guide": None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.shopping_lists.insert_one(doc)
+    return {"list": _public_list(doc)}
+
+
+@api.get("/shopping-lists")
+async def my_shopping_lists(user=Depends(get_current_user)):
+    docs = await db.shopping_lists.find({"user_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    return {"lists": [_public_list(d) for d in docs]}
+
+
+@api.get("/shopping-lists/{list_id}")
+async def get_shopping_list(list_id: str, user=Depends(get_current_user)):
+    doc = await db.shopping_lists.find_one({"id": list_id, "user_id": user["id"]}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Shopping list not found")
+    return {"list": _public_list(doc)}
+
+
+@api.delete("/shopping-lists/{list_id}")
+async def delete_shopping_list(list_id: str, user=Depends(get_current_user)):
+    res = await db.shopping_lists.delete_one({"id": list_id, "user_id": user["id"]})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Shopping list not found")
+    return {"ok": True}
+
+
+@api.post("/shopping-lists/{list_id}/cooking-guide")
+async def shopping_list_cooking_guide(list_id: str, user=Depends(get_current_user)):
+    """Start Cooking: AI-guided combined step-by-step plan for all recipes in the list."""
+    doc = await db.shopping_lists.find_one({"id": list_id, "user_id": user["id"]}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Shopping list not found")
+    if doc.get("cooking_guide"):
+        return {"cooking_guide": doc["cooking_guide"]}
+
+    ids = [m["recipe_id"] for m in doc.get("recipes", [])]
+    recs = await db.recipes.find({"id": {"$in": ids}}, {"_id": 0}).to_list(200)
+    by_id = {r["id"]: r for r in recs}
+    payload = []
+    for m in doc.get("recipes", []):
+        rec = by_id.get(m["recipe_id"])
+        if not rec:
+            continue
+        base = max(1, int(rec.get("servings") or 1))
+        factor = m["pax"] / base
+        payload.append({
+            "title": rec.get("title"),
+            "pax": m["pax"],
+            "ingredients": [{"name": i.get("name"), "unit": i.get("unit"),
+                             "quantity": scale_quantity(i.get("quantity", ""), factor)}
+                            for i in rec.get("ingredients", [])],
+            "steps": rec.get("instructions", []) or rec.get("steps", []),
+        })
+    guide = await cooking_guide.generate_cooking_guide(doc.get("name"), payload)
+    await db.shopping_lists.update_one({"id": list_id}, {"$set": {"cooking_guide": guide}})
+    return {"cooking_guide": guide}
 
 
 # ---------------- Recipes ----------------

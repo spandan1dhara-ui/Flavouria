@@ -119,7 +119,7 @@ export function CookMode({ open, onClose, title, ingredients = [], method = [] }
       )}
 
       {showIng && (
-        <div className="absolute inset-0 z-10 bg-ink/95 backdrop-blur p-6 sm:p-10 overflow-y-auto pt-24" data-testid="cook-mode-ingredients-panel">
+        <div className="absolute inset-0 z-30 bg-ink/95 backdrop-blur p-6 sm:p-10 overflow-y-auto pt-24" data-testid="cook-mode-ingredients-panel">
           <div className="max-w-2xl mx-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-heading text-2xl font-black">Ingredients</h3>

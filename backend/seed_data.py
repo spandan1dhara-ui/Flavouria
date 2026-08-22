@@ -30,6 +30,9 @@ IMG = {
     "streetfood": "https://images.unsplash.com/photo-1732519970445-8f2d6998961f?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
     "dosaplatter": "https://images.pexels.com/photos/941869/pexels-photo-941869.jpeg?auto=compress&cs=tinysrgb&w=1200",
     "idli": "https://images.unsplash.com/photo-1589301773859-bb024d3ad558?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
+    "plainrice": "https://images.unsplash.com/photo-1516684732162-798a0062be99?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200",
+    "muttonkosha": "https://images.pexels.com/photos/9609846/pexels-photo-9609846.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    "bhindi": "https://images.pexels.com/photos/35008222/pexels-photo-35008222.jpeg?auto=compress&cs=tinysrgb&w=1200",
 }
 
 AVA = {
@@ -303,9 +306,47 @@ add("Dal Makhani", "rahuls-kitchen", "Indian", "Punjabi", "Curry", "Vegetarian",
     IMG["curries"], 4.7, 1210)
 
 
+# Everyday Bengali / Indian home food (matches Plan-your-Meal examples)
+add("Steamed Plain Rice", "bong-eats-home", "Indian", "Bengali", "Rice", "Vegan", "mild",
+    "Easy", 5, 20, 4, ["plain rice", "rice", "steamed rice", "bhat", "basmati"],
+    [ing("Basmati Rice", "2", "cup"), ing("Water", "4", "cup"), ing("Salt", "1", "tsp")],
+    ["Rinse the rice 2–3 times until the water runs clear.",
+     "Bring the water to a rolling boil with salt.",
+     "Add the drained rice and cook uncovered until 90% done.",
+     "Cover, lower the heat and steam for 5 minutes.",
+     "Rest for 5 minutes, then fluff gently with a fork and serve."],
+    IMG["plainrice"], 4.7, 1520)
+add("Kolkata Mutton Kosha", "bong-eats-home", "Bengali", "Bengali", "Curry", "Non-Vegetarian", "spicy",
+    "Advanced", 30, 90, 4, ["mutton kosha", "kosha mangsho", "mutton", "bengali", "slow cooked"],
+    [ing("Mutton", "750", "g"), ing("Onion", "4"), ing("Yogurt", "1", "cup"),
+     ing("Ginger-Garlic Paste", "3", "tbsp"), ing("Mustard Oil", "4", "tbsp"),
+     ing("Kashmiri Chilli", "1", "tbsp"), ing("Garam Masala", "1", "tbsp"),
+     ing("Potato", "2"), ing("Bay Leaf", "2")],
+    ["Marinate the mutton in yogurt, ginger-garlic and spices for 2 hours.",
+     "Heat mustard oil and fry the potatoes till golden; set aside.",
+     "Caramelise the sliced onions slowly until deep brown.",
+     "Add the marinated mutton and bhuno (sauté) on medium heat for 20 minutes.",
+     "Add a little hot water, cover and slow-cook until the mutton is fork-tender.",
+     "Return the potatoes, finish with garam masala and cook down to a thick gravy.",
+     "Rest briefly and serve hot with rice or luchi."],
+    IMG["muttonkosha"], 4.9, 2140)
+add("Bhindi Fry (Okra Sabzi)", "spice-route", "Indian", "North Indian", "Sabzi", "Vegan", "medium",
+    "Easy", 10, 20, 3, ["bhendi", "bhindi", "okra", "ladies finger", "sabzi", "stir fry"],
+    [ing("Okra (Bhindi)", "400", "g"), ing("Onion", "1"), ing("Mustard Oil", "2", "tbsp"),
+     ing("Turmeric", "0.5", "tsp"), ing("Red Chilli Powder", "1", "tsp"),
+     ing("Cumin Seeds", "1", "tsp"), ing("Amchur", "1", "tsp"), ing("Salt", "1", "tsp")],
+    ["Wash and thoroughly dry the okra, then cut into 1-inch pieces.",
+     "Heat oil and crackle the cumin seeds.",
+     "Add sliced onion and sauté until soft.",
+     "Add the okra and stir-fry on medium-high, uncovered, so it stays crisp.",
+     "Sprinkle turmeric, chilli, salt and amchur; toss to coat.",
+     "Cook until the okra is tender and lightly charred; serve with roti."],
+    IMG["bhindi"], 4.6, 870)
+
+
 async def seed():
-    if await db.recipes.count_documents({}) > 0:
-        return
+    existing_titles = set(await db.recipes.distinct("title"))
+    first_run = len(existing_titles) == 0
     now = datetime.now(timezone.utc).isoformat()
     # creator users + creator profiles
     creator_id_by_slug = {}
@@ -339,8 +380,10 @@ async def seed():
         )
         creator_id_by_slug[c["slug"]] = creator_id
 
-    used_slugs = set()
+    used_slugs = set(await db.recipes.distinct("slug"))
     for r in R:
+        if r["title"] in existing_titles:
+            continue
         base = slugify(r["title"])
         slug = base
         n = 2

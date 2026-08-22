@@ -1,0 +1,61 @@
+{
+  "summary": "Full-stack test of the multi-recipe shopping-list builder. Backend: new suite /app/backend/tests/test_shopping_lists.py (34 tests) covering parse_qty/consolidate_ingredients unit math, GET /api/recipes/lookup, POST/GET/GET{id}/DELETE /api/shopping-lists, auth gating (401), ownership isolation (404 for other user), pax clamping (0->1, 5000->100), and the Claude cooking-guide (generate + cache + persistence). All 34 pass; the full backend suite is 159/159. Consolidation math verified exactly: Steamed Plain Rice pax4/base4 x1, Kolkata Mutton Kosha pax6/base4 x1.5 (Mutton 750g -> 1125g), Bhindi Fry pax4/base3 x1.33, and Salt merged across Rice+Bhindi = 2.33 tsp. Frontend: found and fixed ONE BLOCKER (result cards were submit buttons inside the search form, so selecting a recipe was instantly undone). After the fix the entire journey passes on desktop (1920) and mobile (390): auth gate redirect, search -> select -> pax stepper -> Add to List -> badge, duplicate 'already in your list' toast, View List dialog (per-item pax steppers + remove + count update), Generate from both the sticky bar and the dialog, navigation to /shopping-lists/<id> with correct consolidated rows, staging cleared after generate, Profile > Shopping Lists (cards, open, delete), Start Cooking -> Cook Mode 12-step Claude guide with next/prev/done, cached guide opens instantly (0.0s), copy-list, back-to-profile, and a proper 'List not found' state for a bogus id.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/shopping-lists", "issue": "Unknown recipe_ids are silently dropped (only 404 when ALL are unknown). A partially-valid request returns 200 with fewer recipes than requested and no warning - consider returning the skipped ids."},
+      {"endpoint": "POST /api/shopping-lists", "issue": "No de-duplication server-side: sending the same recipe_id twice creates two recipe entries and doubles its ingredients. The UI blocks duplicates but the API does not."},
+      {"endpoint": "consolidate_ingredients()", "issue": "Merge key is (name.lower(), unit.lower()) only - no unit normalisation, so 'g' vs 'grams' or 'tbsp' vs 'tablespoon' would produce two rows for the same ingredient. Seed data is consistent today, so not currently visible."},
+      {"endpoint": "consolidate_ingredients()", "issue": "Non-numeric quantities ('to taste', 'a pinch') collapse to an empty quantity string; the original wording is lost (UI then prints 'to taste', which happens to read fine, but the information is dropped in the API payload)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PlanMeal.jsx - recipe result cards / Add to List", "issue": "BLOCKER (FIXED BY ME): the <button> for each search result and the Add-to-List button live inside the search <form> and had no type attribute, so their implicit type='submit' fired the form's onSubmit=doSearch, which starts with setSelected(null). Clicking a result therefore never showed selected-recipe-panel and the builder was 100% unusable. Verified via DOM: button.type === 'submit' and 1 submit event per result click. Added type=\"button\" to both.", "selector": "[data-testid^='result-'], [data-testid='add-to-list-button']", "priority": "CRITICAL (fixed)"},
+      {"component": "CookMode.jsx ingredients panel", "issue": "Overlay/z-index bug: the ingredients panel is z-10 while the cook-mode <header> is z-20, so the header covers the panel's 'Ingredients' title and its close button. document.elementFromPoint over cook-mode-ingredients-close returns the HEADER and Playwright's normal click times out ('header intercepts pointer events'). Not a dead end (the header Ingredients toggle closes it), but the X is unclickable and the heading is visually overlapped. Fix: give the panel z-30 (or render it above the header).", "selector": "[data-testid='cook-mode-ingredients-close']", "priority": "HIGH"},
+      {"component": "Profile.jsx delete-list-<id>", "issue": "Deletes a saved shopping list immediately with no confirmation dialog and no undo - one mis-click destroys the list.", "selector": "[data-testid^='delete-list-']", "priority": "MEDIUM"},
+      {"component": "Footer", "issue": "Footer still shows a 'Log in' link while the user is authenticated (seen on /plan-meal and /profile as an admin).", "selector": "footer a:has-text('Log in')", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/shopping-lists/<id> consolidated list", "issues": ["prettyQty renders awkward mixed fractions for scaled values: 'Okra (Bhindi) 533 1/3 g', 'Onion 7 1/3', 'Mustard Oil 8 2/3 tbsp'. For a shopping list, gram amounts should be rounded to a sensible unit (e.g. 535 g / 550 g) and countable items rounded up to whole numbers (8 onions, not 7 1/3).", "Rows with no unit ('Potato 3', 'Bay Leaf 3', 'Onion 7 1/3') give no hint that the number is a count."]},
+      {"screen": "Profile > Shopping Lists", "issues": ["Two lists built from the same recipes are indistinguishable - the card shows only the concatenated recipe names, no created_at date/time, so 'most recent' is impossible to tell apart.", "Long auto-generated names truncate mid-word ('Bhindi Fry (Okra S...')."]},
+      {"screen": "/plan-meal (mobile 390px)", "issues": ["The View List dialog is narrow: recipe titles truncate to 'Stea...' / 'Bhin...' because the pax stepper + delete button eat the row width. Consider stacking the stepper below the title on small screens."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_shopping_lists.py",
+    "/app/test_reports/pytest/pytest_results.xml",
+    "/app/tests/cleanup_shopping_lists.py"
+  ],
+  "action_items": [
+    "REVIEW MY FIX: I added type=\"button\" to the result cards and add-to-list-button in PlanMeal.jsx (this was the blocker). Keep it, and audit other buttons rendered inside <form> elements for the same implicit-submit problem.",
+    "Fix the CookMode ingredients panel z-index (panel z-10 vs header z-20) so cook-mode-ingredients-close is clickable and the 'Ingredients' heading is not covered.",
+    "Add a confirmation step to delete-list-<id> on Profile.",
+    "Show created_at (date/time) on each shopping-list card so the most recent list is identifiable.",
+    "Round scaled quantities sensibly on the shopping list ('533 1/3 g' -> '535 g', '7 1/3' onions -> '8').",
+    "Optional backend hardening: de-duplicate recipe_ids and report skipped/unknown ids in POST /api/shopping-lists; normalise units before merging in consolidate_ingredients().",
+    "Hide the footer 'Log in' link for authenticated users."
+  ],
+  "critical_code_review_comments": [
+    "PlanMeal.jsx: any <button> inside a <form> must carry type=\"button\" unless it is the submit control - this exact omission silently reset component state and broke the whole feature; the PaxStepper already did it correctly, so the pattern was inconsistent.",
+    "PlanMeal.jsx: staged items live only in component state, so a page refresh or accidental navigation loses the whole staging list. Persist to localStorage.",
+    "PlanMeal.jsx: doSearch() calls setSelected(null) unconditionally; combine that with the submit issue above and the bug is invisible in code review - prefer resetting selection only when the query actually changes.",
+    "CookMode.jsx: the ingredients overlay uses z-10 under a z-20 header - stacking context bug, and its close button is therefore untestable/unclickable.",
+    "server.py is 873 lines and mixes search, meal-plan, shopping-lists, recipes and admin concerns - split into routers (the shopping-list block is a clean seam).",
+    "server.py recipes_lookup() rebuilds the same unbounded 5-clause-per-token $or regex query as /api/search and /api/meal-plan - extract one shared candidate-query helper (3rd duplication of this logic).",
+    "server.py: POST /api/shopping-lists trusts the client for pax only (clamped) but does not bound len(body.items) - a client can post hundreds of recipe ids in one list; add a max_items constraint on ShoppingListCreate."
+  ],
+  "updated_files": [
+    "/app/frontend/src/pages/PlanMeal.jsx (added type=\"button\" to result cards + add-to-list-button)",
+    "/app/backend/tests/test_shopping_lists.py (new)",
+    "/app/tests/cleanup_shopping_lists.py (new helper)"
+  ],
+  "success_rate": {"backend": "100% (34/34 new shopping-list tests; 159/159 full suite)", "frontend": "100% of the 10 requested flows pass after the type=\"button\" fix (0% before it - builder was unusable)"},
+  "seed_data_creation": "No new seed data. Created several shopping lists for admin@flavouria.com during UI testing and deleted all of them afterwards via /app/tests/cleanup_shopping_lists.py (remaining: 0). Pytest fixtures clean up their own lists; the ownership test also registers a throwaway TEST_user_*@flavouriaqa.com account.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "admin@flavouria.com / Flavouria@2026 (from /app/memory/test_credentials.md) - valid, cookie-based login works.",
+  "context_for_next_testing_agent": "New suite: /app/backend/tests/test_shopping_lists.py (imports parse_qty/consolidate_ingredients directly from server.py, plus live API tests; module-scoped 'client' fixture logs in as admin and a module-scoped autouse fixture deletes every list it created). Full suite: 159 passed in ~32s. NOTE for JSON leak assertions: assert '\"_id\"' (quoted) not '_id' - the payload legitimately contains 'recipe_id'. The /plan-meal builder only works because of the type=\"button\" fix in PlanMeal.jsx - if a regression reappears where selecting a recipe does nothing, check the implicit form submit first. Still open: CookMode ingredients-panel z-index (close button unclickable, was also flagged in iteration_3), no delete confirmation on Profile, no created_at on list cards. Cooking-guide generation via Claude took <20s on first call and is cached on the document thereafter. Anonymous 401s on /api/auth/me and /api/youtube/saved are expected.",
+  "rca_of_the_issue": "Blocker RCA: in PlanMeal.jsx the recipe result cards and the Add-to-List button are rendered inside the <form data-testid='recipe-search-form'> whose onSubmit is doSearch. Neither button declared type, so the HTML default 'submit' applied. Clicking a result ran pick(r) (setSelected) and then the bubbling submit ran doSearch, whose first action is setSelected(null) - React batched both, so selection was cleared in the same commit and selected-recipe-panel never rendered, making staging, View List, and Generate all unreachable. Proven in-browser: button.type === 'submit' and exactly 1 form submit event per result click with 0 panels rendered. Fix applied: type=\"button\" on both controls; the entire journey then passed end-to-end on desktop and mobile."
+}

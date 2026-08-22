@@ -21,7 +21,7 @@ function MegaMenu({ label, items, navigate }) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button data-testid={`nav-${label.toLowerCase().replace(/\s+/g, "-")}`}
-          className="inline-flex items-center gap-1 px-3.5 py-2 rounded-full text-sm font-bold text-ink-soft hover:text-ink hover:bg-white transition-colors">
+          className="inline-flex items-center gap-1 whitespace-nowrap px-3.5 py-2 rounded-full text-sm font-bold text-ink-soft hover:text-ink hover:bg-white transition-colors">
           {label} <ChevronDown size={15} />
         </button>
       </DropdownMenuTrigger>
@@ -50,15 +50,18 @@ export function Navbar() {
         <Logo onClick={() => navigate("/")} />
 
         <div className="hidden lg:flex items-center gap-1">
-          <Link to="/categories" data-testid="nav-world-of-recipes" className="px-3.5 py-2 rounded-full text-sm font-bold text-ink-soft hover:text-ink hover:bg-white transition-colors">
+          <Link to="/categories" data-testid="nav-world-of-recipes" className="whitespace-nowrap px-3.5 py-2 rounded-full text-sm font-bold text-ink-soft hover:text-ink hover:bg-white transition-colors">
             World of Recipes
           </Link>
           <MegaMenu label="Best Indian Cuisines" items={INDIAN} navigate={navigate} />
           <MegaMenu label="Healthy Easy Food" items={HEALTHY} navigate={navigate} />
-          <Link to="/creator" data-testid="nav-for-creators" className="px-3.5 py-2 rounded-full text-sm font-bold text-ink-soft hover:text-ink hover:bg-white transition-colors">
+          <Link to="/plan-meal" data-testid="nav-plan-your-meal" className="whitespace-nowrap px-3.5 py-2 rounded-full text-sm font-bold text-ink-soft hover:text-ink hover:bg-white transition-colors">
+            Plan your Meal
+          </Link>
+          <Link to="/creator" data-testid="nav-for-creators" className="whitespace-nowrap px-3.5 py-2 rounded-full text-sm font-bold text-ink-soft hover:text-ink hover:bg-white transition-colors">
             For Creators
           </Link>
-          <Link to="/about" data-testid="nav-about" className="px-3.5 py-2 rounded-full text-sm font-bold text-ink-soft hover:text-ink hover:bg-white transition-colors">
+          <Link to="/about" data-testid="nav-about" className="whitespace-nowrap px-3.5 py-2 rounded-full text-sm font-bold text-ink-soft hover:text-ink hover:bg-white transition-colors">
             About
           </Link>
         </div>
@@ -66,8 +69,8 @@ export function Navbar() {
         <div className="flex items-center gap-2">
           {!user ? (
             <>
-              <Link to="/login" data-testid="nav-login" className="hidden sm:inline-flex items-center h-10 px-4 rounded-full text-sm font-bold text-ink hover:bg-white transition-colors">Log in</Link>
-              <Link to="/creator" data-testid="nav-become-creator" className="hidden sm:inline-flex items-center h-10 px-4 rounded-full text-sm font-bold bg-coral hover:bg-coral-hover text-white transition-colors">Become a Creator</Link>
+              <Link to="/login" data-testid="nav-login" className="hidden sm:inline-flex items-center h-10 px-4 rounded-full text-sm font-bold text-ink hover:bg-white transition-colors whitespace-nowrap">Log in</Link>
+              <Link to="/creator" data-testid="nav-become-creator" className="hidden sm:inline-flex items-center h-10 px-4 rounded-full text-sm font-bold bg-coral hover:bg-coral-hover text-white transition-colors whitespace-nowrap">Become a Creator</Link>
             </>
           ) : (
             <DropdownMenu>
@@ -114,6 +117,7 @@ export function Navbar() {
                   <SheetClose asChild key={q}><Link to={`/search?q=${encodeURIComponent(q)}`} className="px-6 py-2.5 rounded-xl text-sm font-semibold text-ink-soft hover:bg-white">{lbl}</Link></SheetClose>
                 ))}
                 <div className="h-px bg-border my-3" />
+                <SheetClose asChild><Link to="/plan-meal" className="px-4 py-3 rounded-xl text-base font-bold text-ink hover:bg-white">Plan your Meal</Link></SheetClose>
                 <SheetClose asChild><Link to="/creator" className="px-4 py-3 rounded-xl text-base font-bold text-ink hover:bg-white">For Creators</Link></SheetClose>
                 <SheetClose asChild><Link to="/about" className="px-4 py-3 rounded-xl text-base font-bold text-ink hover:bg-white">About</Link></SheetClose>
                 <div className="h-px bg-border my-3" />

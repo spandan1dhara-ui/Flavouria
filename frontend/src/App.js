@@ -11,6 +11,7 @@ import Home from "./pages/Home";
 import SearchPage from "./pages/Search";
 import RecipeDetail from "./pages/RecipeDetail";
 import Categories from "./pages/Categories";
+import PlanMeal from "./pages/PlanMeal";
 import CreatorLanding from "./pages/CreatorLanding";
 import CreatorDashboard from "./pages/CreatorDashboard";
 import RecipeBuilder from "./pages/RecipeBuilder";
@@ -54,6 +55,7 @@ function AppRouter() {
         <Route path="/search" element={<SearchPage />} />
         <Route path="/recipe/:slug" element={<RecipeDetail />} />
         <Route path="/categories" element={<Categories />} />
+        <Route path="/plan-meal" element={<PlanMeal />} />
         <Route path="/about" element={<About />} />
         <Route path="/creator" element={<CreatorLanding />} />
         <Route

@@ -39,6 +39,31 @@ def slugify(text):
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
 
+def scale_quantity(qty, factor):
+    """Scale a numeric ingredient quantity string by `factor`, preserving any trailing text."""
+    q = (qty or "").strip()
+    if not q:
+        return q
+    m = re.match(r"^\s*([\d]+(?:\.\d+)?(?:\s*/\s*\d+)?)", q)
+    if not m:
+        return q
+    raw = m.group(1)
+    try:
+        if "/" in raw:
+            a, b = raw.split("/")
+            num = float(a) / float(b)
+        else:
+            num = float(raw)
+    except (ValueError, ZeroDivisionError):
+        return q
+    scaled = num * factor
+    if abs(scaled - round(scaled)) < 1e-9:
+        val = str(int(round(scaled)))
+    else:
+        val = ("%.2f" % scaled).rstrip("0").rstrip(".")
+    return (val + q[m.end():]).strip()
+
+
 async def get_ranking_config():
     doc = await db.settings.find_one({"key": "ranking"}, {"_id": 0})
     cfg = {**ranking.DEFAULT_CONFIG}
@@ -217,6 +242,65 @@ async def explore(q: str = "", skip: int = 0, limit: int = 6):
     page = ordered[skip:skip + limit]
     await attach_creators(page)
     return {"total": total, "recipes": page, "skip": skip, "limit": limit}
+
+
+@api.get("/meal-plan")
+async def meal_plan(q: str = Query("", alias="q"), pax: int = 2):
+    """Plan your Meal: find the best-matching recipe for a dish and return a shopping
+    list with each ingredient's quantity scaled to the requested number of people."""
+    query = q.strip()
+    if not query:
+        return {"found": False, "query": query, "pax": pax}
+    pax = max(1, min(int(pax or 1), 100))
+
+    filt = {"status": "PUBLISHED"}
+    ors = []
+    for tok in ranking.tokenize(query) + [query]:
+        rx = re.escape(tok)
+        ors.extend([
+            {"title": {"$regex": rx, "$options": "i"}},
+            {"tags": {"$regex": rx, "$options": "i"}},
+            {"category": {"$regex": rx, "$options": "i"}},
+            {"cuisine": {"$regex": rx, "$options": "i"}},
+            {"region": {"$regex": rx, "$options": "i"}},
+        ])
+    if ors:
+        filt["$or"] = ors
+    candidates = await db.recipes.find(filt, {"_id": 0}).to_list(200)
+    if not candidates:
+        return {"found": False, "query": query, "pax": pax}
+
+    cfg = await get_ranking_config()
+    cmap = await creators_map({c["creator_id"] for c in candidates if c.get("creator_id")})
+    scored = ranking.score_recipes(candidates, query, cmap, cfg)
+    recipe = scored[0]
+
+    base = max(1, int(recipe.get("servings") or 1))
+    factor = pax / base
+    shopping_list = []
+    for ingr in recipe.get("ingredients", []):
+        base_qty = ingr.get("quantity", "")
+        shopping_list.append({
+            "name": ingr.get("name", ""),
+            "unit": ingr.get("unit", ""),
+            "base_quantity": base_qty,
+            "quantity": scale_quantity(base_qty, factor),
+        })
+
+    return {
+        "found": True,
+        "query": query,
+        "pax": pax,
+        "base_servings": base,
+        "recipe": {
+            "id": recipe.get("id"), "title": recipe.get("title"), "slug": recipe.get("slug"),
+            "thumbnail": recipe.get("thumbnail"), "cuisine": recipe.get("cuisine"),
+            "category": recipe.get("category"), "prep_time": recipe.get("prep_time"),
+            "cook_time": recipe.get("cook_time"), "difficulty": recipe.get("difficulty"),
+            "creator": public_creator(cmap.get(recipe.get("creator_id"))),
+        },
+        "shopping_list": shopping_list,
+    }
 
 
 # ---------------- Recipes ----------------

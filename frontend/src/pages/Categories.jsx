@@ -38,7 +38,7 @@ export default function Categories() {
               <div className={`grid place-items-center w-12 h-12 rounded-2xl ${CUISINE_COLORS[i % CUISINE_COLORS.length]}`}>
                 <Utensils size={22} />
               </div>
-              <span className="text-sm font-bold text-ink-soft">{c.count} recipes</span>
+              <span className="text-sm font-bold text-ink-soft">{c.count > 0 ? `${c.count} recipes` : "Explore"}</span>
             </div>
             <h3 className="mt-4 font-heading text-2xl font-black text-ink">{c.cuisine}</h3>
             <div className="mt-3 flex flex-wrap gap-2">

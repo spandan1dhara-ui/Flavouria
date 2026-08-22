@@ -39,10 +39,32 @@ def _yt():
     return build("youtube", "v3", developerKey=YOUTUBE_API_KEY, cache_discovery=False)
 
 
+# Videos that cover many dishes at once (compilations / listicles) are not useful when the
+# user wants ONE specific recipe. Filter these out by their tell-tale titles.
+_NUM = r"(?:\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty)"
+COMPILATION_PATTERNS = [
+    re.compile(rf"\b{_NUM}\b.*\b(recipes|dishes|meals|ideas|dinners|desserts|snacks|breakfasts|lunches|ways|curries|drinks|foods)\b", re.I),
+    re.compile(r"\b(top|best)\s+\d+\b", re.I),
+    re.compile(r"\bcompilation\b", re.I),
+    re.compile(r"\bplaylist\b", re.I),
+    re.compile(r"\brecipes\b.*\byou\s+(need|must|should|have)\b", re.I),
+    re.compile(r"\byou\s+(need|must|should|have)\s+to\s+(cook|try|make)\b", re.I),
+    re.compile(r"\b(recipes|dishes)\s+(in|under)\s+\d+\b", re.I),
+    # Number-less listicles: plural "recipes/dishes/ideas/combinations" signals a multi-dish video.
+    re.compile(r"\b(recipes|dishes|combinations)\b", re.I),
+    re.compile(r"\b(recipe|dish|meal|snack|dinner|breakfast|lunch)\s+ideas\b", re.I),
+]
+
+
+def _is_compilation(title):
+    t = title or ""
+    return any(p.search(t) for p in COMPILATION_PATTERNS)
+
+
 def _search_and_stats(query):
     yt = _yt()
     sr = yt.search().list(part="snippet", q=f"{query} recipe", type="video",
-                          maxResults=8, order="relevance", videoEmbeddable="true",
+                          maxResults=12, order="relevance", videoEmbeddable="true",
                           relevanceLanguage="en", safeSearch="strict").execute()
     ids = [it["id"]["videoId"] for it in sr.get("items", []) if it.get("id", {}).get("videoId")]
     if not ids:
@@ -143,12 +165,22 @@ async def search_youtube_recipes(query):
         if ts.tzinfo is None:
             ts = ts.replace(tzinfo=timezone.utc)
         if ts > datetime.now(timezone.utc) - timedelta(minutes=CACHE_TTL_MIN):
-            return {"query": query, "videos": cached["videos"], "cached": True}
+            vids = cached.get("videos", [])
+            clean = [v for v in vids if not _is_compilation(v.get("title", ""))]
+            # Only serve the cache if it's already free of compilations; otherwise
+            # fall through and re-fetch so stale compilations are never shown.
+            if len(clean) == len(vids):
+                return {"query": query, "videos": vids, "cached": True}
 
     if not YOUTUBE_API_KEY:
         return {"query": query, "videos": [], "error": "YouTube API not configured"}
 
     candidates = await asyncio.to_thread(_search_and_stats, query)
+    if not candidates:
+        return {"query": query, "videos": []}
+
+    # Always drop compilation / multi-recipe videos so every result is a single dish.
+    candidates = [c for c in candidates if not _is_compilation(c["title"])]
     if not candidates:
         return {"query": query, "videos": []}
 

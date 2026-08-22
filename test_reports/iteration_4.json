@@ -1,0 +1,53 @@
+{
+  "summary": "Tested the two new changes: (1) YouTube compilation filter and (2) the new 'Plan your Meal' feature, plus the curated /api/categories page. Backend: added /app/backend/tests/test_meal_plan.py (31 tests: scale_quantity unit tests, _is_compilation regex unit tests, /api/meal-plan scaling+edge cases, curated /api/categories, live /api/youtube no-compilation assertions). Full suite now 125/125 passing. Verified math exactly: Creamy Butter Chicken base_servings=4, pax=6 -> Chicken 600g->900g, Butter 3 tbsp->4.5 tbsp, Fresh Cream 1/2 cup->0.75 cup; pax=4 equals base quantities; pax=0/-5 clamp to 1; pax=500 clamps to 100; unknown dish -> found=false (200, no error); non-int pax -> clean 422. Frontend: navbar nav-plan-your-meal present (desktop + mobile sheet) and routes to /plan-meal; pax +/- works and clamps at 1; Generate returns shopping list (8 rows) with correct scaled quantities; regenerating at pax=2 correctly rescales (900g -> 300g); nonsense dish shows meal-plan-not-found; empty submit shows 'Enter a recipe' toast; mobile (390px) flow works with Carbonara. Categories page shows exactly the 6 curated cuisines (Oriental, Mediterranean, Indian, Italian, French, Mexican), no Dessert and no standalone Bengali card (Bengali is a region chip under Indian), and the subtitle is measurably BELOW the search bar (search y=223, subtitle y=281).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/youtube", "issue": "STALE CACHE serves pre-fix compilations: q='french' returned '6 Top French Recipes You Need to Cook' from a youtube_cache doc written BEFORE the filter shipped (cache TTL=180 min, filter is applied only on a cache miss). I cleared the 4 offending cache keys (french, juice, cabbage, quinoa) and re-fetched - the live pipeline now returns only single-dish videos. Fix: invalidate youtube_cache on filter changes, or re-apply _is_compilation() when reading from cache."},
+      {"endpoint": "youtube_agent.search_youtube_recipes", "issue": "The filter is conditional: `if len(single) >= 3: candidates = single`. If fewer than 3 non-compilation candidates come back, ALL compilations are re-admitted and can rank into the Top 3. Prefer always dropping compilations and returning fewer than 3 results."},
+      {"endpoint": "youtube_agent.COMPILATION_PATTERNS", "issue": "Patterns require a number/keyword, so number-less listicles still pass, e.g. live results included 'Best Juicing Recipes for Beginners ... Simple & Easy Combinations' and '... | Lime recipes'. Consider a pattern for plural 'recipes/dishes/ideas' in the title without a matching single-dish name."},
+      {"endpoint": "/api/categories", "issue": "3 of the 6 curated cuisines have count=0 (Mediterranean, French, Mexican) because no seeded recipe carries those cuisines/regions. Cards render '0 recipes'. Either seed recipes for them or hide/soften the count."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/categories", "issues": ["Mediterranean / French / Mexican cards show '0 recipes' - looks broken to a user even though the community-recipe count is genuinely zero; the region chips still navigate to /search (which falls back to YouTube results), so the count is the only jarring part."]},
+      {"screen": "Navbar (desktop 1920px)", "issues": ["Nav items wrap onto two lines ('World of / Recipes', 'Plan your / Meal', 'Log / in') because each link is narrow - add whitespace-nowrap so top-level nav labels stay on one line."]},
+      {"screen": "/plan-meal shopping list", "issues": ["Scaled fractional quantities are shown as decimals ('0.75 cup', '0.5 tsp') where the source recipe used fractions ('1/2 cup'). Rendering common fractions (3/4, 1/2, 1 1/2) would read better on a shopping list."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_meal_plan.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Invalidate/bypass the youtube_cache for entries created before the compilation filter (or run _is_compilation() on cached videos when serving) - otherwise users keep seeing '6 Top French Recipes You Need to Cook' for up to 3h per query. I only cleared 4 keys manually.",
+    "Make the compilation filter unconditional instead of `if len(single) >= 3`, so a low-yield query can never re-admit compilations.",
+    "Optional: extend COMPILATION_PATTERNS to catch number-less listicles ('Best Juicing Recipes for Beginners').",
+    "Optional: seed Mediterranean/French/Mexican recipes or hide the '0 recipes' badge on empty cuisine cards.",
+    "Optional: add whitespace-nowrap to navbar links; optional: render scaled fractions as fractions on the shopping list."
+  ],
+  "critical_code_review_comments": [
+    "youtube_agent.py: the compilation filter is applied after the network call but not on the cache-read path, so it is not retroactive - filter on read as well.",
+    "server.py /api/meal-plan: pax is clamped to 1..100 server-side (good), but the UI clamps to 1..50 - the two limits should be shared/consistent.",
+    "server.py /api/meal-plan builds the same unbounded $or regex list as /api/explore (5 clauses per token); duplicate logic with /api/search - extract a shared candidate-query helper.",
+    "scale_quantity() handles ints and simple fractions but not mixed numbers ('1 1/2 cup' scales only the leading '1'). Worth handling since seed data may use mixed fractions.",
+    "PlanMeal.jsx has no error-state UI (only a toast) for a failed /meal-plan request - the page stays blank after a network error."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_meal_plan.py",
+    "/app/backend/tests/test_search.py",
+    "/app/tests/check_cache.py",
+    "/app/tests/clear_cache.py",
+    "/app/tests/audit_cache.py"
+  ],
+  "success_rate": {"backend": "100% (125/125 after relaxing one stale assertion; 1 real cache defect found)", "frontend": "100% of requested Plan-your-Meal / Categories flows pass"},
+  "seed_data_creation": "No new seed data. Deleted 4 stale youtube_cache docs (french, juice, cabbage, quinoa) that held pre-fix compilation results; the cache re-populated cleanly. Audited all 29 cache docs - 0 offending videos remain.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "Not needed (all tested endpoints/pages are anonymous). Suite creds still admin@flavouria.com / Flavouria@2026.",
+  "context_for_next_testing_agent": "New suite file: /app/backend/tests/test_meal_plan.py (meal-plan math/edge cases, scale_quantity + _is_compilation unit tests, curated categories, live youtube no-compilation check). test_search.py::TestCategories count assertion was relaxed from >0 to >=0 because curated cuisines Mediterranean/French/Mexican legitimately have 0 recipes. Helper scripts /app/tests/{check_cache,clear_cache,audit_cache}.py let you inspect/clear db.youtube_cache - use clear_cache.py <key> before asserting on freshly-filtered YouTube results, since cached docs bypass the compilation filter. Known open items: conditional filter fallback (len(single)>=3) and cache non-retroactivity. Older UI bugs from iteration_3 (CookMode overlay, stale SearchBar value) were NOT retested this round.",
+  "rca_of_the_issue": "The compilation regex itself is correct (all 8 sample compilation titles, incl. '6 Top French Recipes You Need to Cook', are flagged by unit tests). The failure surfaced only through GET /api/youtube?q=french because search_youtube_recipes() returns cached videos before the filter runs; the 'french' cache doc was written ~12 min before the youtube_agent.py fix landed and had ~2.8h of TTL remaining. Clearing the key and re-querying produced 3 clean single-dish videos, confirming the live filter works."
+}

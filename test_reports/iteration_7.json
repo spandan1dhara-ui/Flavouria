@@ -1,0 +1,27 @@
+{
+  "summary": "Focused test of the mL/g unit-conversion feature for shopping lists. Backend: new suite /app/backend/tests/test_unit_conversion.py (36 tests, all pass) covering canonicalize_unit() (cup/tsp/tbsp/l/ml -> mL, g/kg/lb/oz -> g, counts/piece/cloves/empty untouched, None qty keeps unit), consolidate_ingredients() (cross-unit merge ml+cup=340 mL, kg+g=1250 g, counts unchanged, 'to taste' -> empty, scaling-before-conversion: pax6 Mutton 1125 g + Mustard Oil 90 mL), and API POST /api/shopping-lists for the 3-recipe list (Rice pax4 + Mutton Kosha pax4 + Bhindi pax3): Basmati Rice 480 mL, Water 960 mL, Salt 10 mL, Mutton 750 g, Mustard Oil 90 mL, Yogurt 240 mL, Okra 400 g, Turmeric 2.5 mL, counts Onion 5 / Potato 2 / Bay Leaf 2 with empty unit; only mL/g/'' units present (no cup/tsp/tbsp/kg anywhere); persistence verified via GET, no _id leak. AI recipe (ai-generate 'Aloo Posto') added to a list also yields only mL/g/counts. Regression: test_shopping_lists.py 33/33 pass after I updated 3 stale assertions that encoded the OLD (non-converting) behaviour. Frontend e2e: admin login -> /plan-meal -> searched+added the 3 recipes with pax 4/4/3 -> View List -> Generate My List -> /shopping-lists/<id> showed exactly the expected 17 rows with clean formatting (480 mL, 960 mL, 10 mL, 750 g, 5 Onion, 2 Potato, 2.5 mL Turmeric - no fractions), Copy output and Cook Mode ingredients panel both show the same mL/g/count strings; Start Cooking generated the AI guide and Cook Mode opened.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/shopping-lists/<id>", "issues": ["Dry spices measured in tsp/tbsp are now displayed as volume in mL (e.g. '5 mL Cumin Seeds', '15 mL Garam Masala', '2.5 mL Turmeric', '10 mL Salt'). Correct per the stated rule but shopping-wise odd - consider keeping tsp/tbsp for dry spices or mapping small dry spice volumes to grams", "Semi-solid items also become mL ('45 mL Ginger-Garlic Paste', '240 mL Yogurt')"]},
+      {"screen": "/plan-meal -> list detail transition", "issues": ["Sonner toasts render top-center and overlap the header nav links (visible in screenshot); transient but reduces legibility of both"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_unit_conversion.py", "/app/backend/tests/test_shopping_lists.py", "/app/test_reports/pytest/pytest_unit_conversion.xml", "/app/test_reports/pytest/pytest_shopping_lists.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "canonicalize_unit returns the literal 'mL'/'g' unit string, so merging depends on key (name.lower(), unit.lower()) - fine, but volume vs weight rows for the same ingredient stay separate (e.g. Milk 100 ml + Milk 100 g = 2 rows). Acceptable, just be aware for AI recipes that mix units for the same name.",
+    "Frontend MASS_VOL list in ShoppingListDetail.jsx still carries legacy units (kg/l/litre) that the backend can no longer emit; harmless dead config but could drift - single source of truth would be better.",
+    "AI-generated ingredient names still include prep text ('Bitter gourd (karela), sliced...'), which blocks cross-recipe merging (repeat of iteration_6 note)."
+  ],
+  "updated_files": ["/app/backend/tests/test_unit_conversion.py", "/app/backend/tests/test_shopping_lists.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "API-created TEST_units_* shopping lists deleted in teardown. One UI-created list (Steamed Plain Rice, Kolkata Mutton Kosha, Bhindi Fry) remains under admin@flavouria.com with a cached cooking guide.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "admin@flavouria.com / Flavouria@2026 (worked)",
+  "context_for_next_testing_agent": "Run `cd /app/backend && python -m pytest tests/test_unit_conversion.py` (pytest.ini already sets xdist). I updated 3 assertions in test_shopping_lists.py to the new converted behaviour (salt 11.67 mL, ml+cup merge, volume vs weight not merged). Cooking-guide tests were skipped for time (verified in iteration_6 and via UI here).",
+  "rca_of_the_issue": "N/A - feature verified working as specified; no defects found."
+}

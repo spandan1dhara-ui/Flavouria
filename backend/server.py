@@ -90,10 +90,43 @@ def _fmt_num(total):
     return ("%.2f" % total).rstrip("0").rstrip(".")
 
 
+# Convert measured units to a canonical mL (liquids) or g (solids) for the shopping list.
+# Countable/piece units (cloves, whole counts, pinch, etc.) are kept as-is.
+VOLUME_TO_ML = {
+    "ml": 1, "milliliter": 1, "millilitre": 1, "cc": 1,
+    "l": 1000, "litre": 1000, "liter": 1000, "litres": 1000, "liters": 1000,
+    "tsp": 5, "teaspoon": 5, "teaspoons": 5,
+    "tbsp": 15, "tablespoon": 15, "tablespoons": 15, "tbs": 15,
+    "cup": 240, "cups": 240,
+    "fl oz": 30, "floz": 30, "fluid ounce": 30,
+    "pint": 473, "pints": 473, "quart": 946, "gallon": 3785,
+}
+WEIGHT_TO_G = {
+    "g": 1, "gram": 1, "grams": 1, "gm": 1, "gms": 1,
+    "kg": 1000, "kilogram": 1000, "kilograms": 1000,
+    "mg": 0.001,
+    "oz": 28.35, "ounce": 28.35, "ounces": 28.35,
+    "lb": 453.6, "lbs": 453.6, "pound": 453.6, "pounds": 453.6,
+}
+
+
+def canonicalize_unit(quantity, unit):
+    """Return (value, canonical_unit) with volume->mL and weight->g.
+    Count/piece units are returned unchanged so '2 onions' stays a count."""
+    u = (unit or "").strip().lower()
+    if quantity is None:
+        return None, (unit or "").strip()
+    if u in VOLUME_TO_ML:
+        return quantity * VOLUME_TO_ML[u], "mL"
+    if u in WEIGHT_TO_G:
+        return quantity * WEIGHT_TO_G[u], "g"
+    return quantity, (unit or "").strip()
+
+
 def consolidate_ingredients(recipe_pax_pairs):
     """Merge scaled ingredients across multiple recipes.
-    recipe_pax_pairs: list of (recipe_doc, pax). Ingredients are grouped by
-    (name, unit); numeric quantities are scaled by pax/servings and summed."""
+    Measured quantities are converted to mL (liquids) or g (solids) and summed;
+    countable items keep their unit. Grouped by (name, canonical unit)."""
     agg = {}
     order = []
     for rec, pax in recipe_pax_pairs:
@@ -103,15 +136,18 @@ def consolidate_ingredients(recipe_pax_pairs):
             name = (ingr.get("name") or "").strip()
             if not name:
                 continue
-            unit = (ingr.get("unit") or "").strip()
+            num, _ = parse_qty(ingr.get("quantity", ""))
+            if num is not None:
+                value, unit = canonicalize_unit(num * factor, ingr.get("unit", ""))
+            else:
+                value, unit = None, (ingr.get("unit") or "").strip()
             key = (name.lower(), unit.lower())
             if key not in agg:
                 agg[key] = {"name": name, "unit": unit, "total": 0.0,
                             "has_num": False, "has_nonnum": False}
                 order.append(key)
-            num, _ = parse_qty(ingr.get("quantity", ""))
-            if num is not None:
-                agg[key]["total"] += num * factor
+            if value is not None:
+                agg[key]["total"] += value
                 agg[key]["has_num"] = True
             else:
                 agg[key]["has_nonnum"] = True

@@ -25,8 +25,11 @@ function formatShoppingQty(q, unit) {
   if (isNaN(num)) return q;
   const u = (unit || "").toLowerCase();
   if (!unit) return String(Math.ceil(num)); // countable item -> whole number
-  if (MASS_VOL.includes(u)) return num >= 10 ? String(Math.round(num)) : prettyQty(String(num));
-  return prettyQty(String(num)); // tsp/tbsp/cup keep friendly fractions
+  if (MASS_VOL.includes(u)) {
+    // mL / g: show clean numbers, never fractions
+    return num >= 10 ? String(Math.round(num)) : String(Math.round(num * 10) / 10);
+  }
+  return prettyQty(String(num)); // count units (cloves, pinch) keep friendly fractions
 }
 
 export default function ShoppingListDetail() {

@@ -38,10 +38,11 @@ class TestConsolidate:
         ]}
         out = consolidate_ingredients([(r1, 4), (r2, 4)])
         by = {i["name"].lower(): i for i in out}
-        assert by["rice"]["quantity"] == "400"
-        assert by["okra"]["quantity"] == "400"
-        # 1 + 1*(4/3) = 2.33
-        assert by["salt"]["quantity"] == "2.33"
+        assert by["rice"]["quantity"] == "400" and by["rice"]["unit"] == "g"
+        assert by["okra"]["quantity"] == "400" and by["okra"]["unit"] == "g"
+        # (1 + 1*(4/3)) tsp = 2.33 tsp -> 11.67 mL
+        assert by["salt"]["quantity"] == "11.67"
+        assert by["salt"]["unit"] == "mL"
         assert len(out) == 3  # salt merged case-insensitively
 
     def test_non_numeric_quantity_yields_empty(self):
@@ -49,9 +50,16 @@ class TestConsolidate:
         out = consolidate_ingredients([(r, 4)])
         assert out[0]["quantity"] == ""
 
-    def test_different_units_not_merged(self):
+    def test_compatible_volume_units_merge_to_ml(self):
         r1 = {"servings": 1, "ingredients": [{"name": "Milk", "unit": "ml", "quantity": "100"}]}
         r2 = {"servings": 1, "ingredients": [{"name": "Milk", "unit": "cup", "quantity": "1"}]}
+        out = consolidate_ingredients([(r1, 1), (r2, 1)])
+        assert len(out) == 1
+        assert out[0]["unit"] == "mL" and out[0]["quantity"] == "340"
+
+    def test_volume_and_weight_not_merged(self):
+        r1 = {"servings": 1, "ingredients": [{"name": "Milk", "unit": "ml", "quantity": "100"}]}
+        r2 = {"servings": 1, "ingredients": [{"name": "Milk", "unit": "g", "quantity": "100"}]}
         out = consolidate_ingredients([(r1, 1), (r2, 1)])
         assert len(out) == 2
 
@@ -173,14 +181,16 @@ class TestShoppingListCRUD:
         assert lst["cooking_guide"] is None
         assert lst["name"]
 
-        items = {(i["name"].lower(), i["unit"].lower()): i for i in lst["shopping_list"]}
+        items = {(i["name"].lower(), i["unit"]): i for i in lst["shopping_list"]}
         # Mutton 750 g at x1.5 -> 1125
         mutton_key = next(k for k in items if "mutton" in k[0])
         assert items[mutton_key]["quantity"] == "1125"
-        # Salt merged across Rice (1 tsp, x1) + Bhindi (1 tsp, x1.33) = 2.33
-        salt = items.get(("salt", "tsp"))
-        assert salt is not None, f"salt tsp missing in {list(items)}"
-        assert salt["quantity"] == "2.33", salt
+        assert items[mutton_key]["unit"] == "g"
+        # Salt merged across Rice (1 tsp, x1) + Bhindi (1 tsp, x1.33) = 2.33 tsp -> 11.67 mL
+        salt = items.get(("salt", "mL"))
+        assert salt is not None, f"salt mL missing in {list(items)}"
+        assert salt["quantity"] == "11.67", salt
+        assert all(i["unit"] in ("mL", "g", "") for i in lst["shopping_list"]), lst["shopping_list"]
 
     def test_get_by_id_and_persistence(self, client, recipe_ids, created_ids):
         rice = recipe_ids["Steamed Plain Rice"]
